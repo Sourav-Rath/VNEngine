@@ -7,20 +7,46 @@
     },
     {
       "id": 1,
-      "text": "Two paths lie ahead.",
+      "text": "You see a key on the ground.",
       "choices": [
-        { "text": "Go left", "next": 2 },
-        { "text": "Go right", "next": 3 }
+        {
+          "text": "Pick up the key",
+          "next": 2,
+          "setFlags": {
+            "hasKey": true
+          }
+        },
+        {
+          "text": "Ignore the key",
+          "next": 2
+        }
       ]
     },
     {
       "id": 2,
-      "text": "A monster appears.",
-      "next": -1
+      "text": "You reach a locked door.",
+      "choices": [
+        {
+          "text": "Open the door",
+          "next": 3,
+          "conditions": {
+            "hasKey": true
+          }
+        },
+        {
+          "text": "Break the door",
+          "next": 4
+        }
+      ]
     },
     {
       "id": 3,
-      "text": "You escaped safely.",
+      "text": "You unlocked the door and escaped.",
+      "next": -1
+    },
+    {
+      "id": 4,
+      "text": "You failed to break the door and got caught.",
       "next": -1
     }
   ]

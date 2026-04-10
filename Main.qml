@@ -6,7 +6,7 @@ ApplicationWindow {
     width: 800
     height: 600
 
-    color: "#202020"   // background fix
+    color: "#202020"
 
     Column {
         anchors.centerIn: parent
@@ -22,7 +22,7 @@ ApplicationWindow {
         }
 
         // =========================
-        // DEBUG (Model size)
+        // DEBUG
         // =========================
         Text {
             text: "Model size: " + dialogueManager.choicesModel.rowCount()
@@ -30,7 +30,7 @@ ApplicationWindow {
         }
 
         // =========================
-        // NEXT BUTTON (no choices)
+        // NEXT BUTTON (only when no choices)
         // =========================
         Button {
             text: "Next"
@@ -38,7 +38,8 @@ ApplicationWindow {
             visible: dialogueManager.choicesModel.rowCount() === 0
 
             onClicked: {
-                dialogueManager.next()
+                if (dialogueManager.choicesModel.rowCount() === 0)
+                    dialogueManager.next()
             }
         }
 
@@ -52,10 +53,15 @@ ApplicationWindow {
                 model: dialogueManager.choicesModel
 
                 delegate: Button {
-                    text: model.text
+                    //  show requirement text
+                    text: model.text + (model.enabled ? "" : " (" + model.requirement + ")")
+
+                    //  disable button
+                    enabled: model.enabled
 
                     onClicked: {
-                        dialogueManager.selectChoice(model.nextNodeId)
+                        if (model.enabled)
+                            dialogueManager.selectChoice(index)
                     }
                 }
             }

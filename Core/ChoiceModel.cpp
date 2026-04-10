@@ -29,6 +29,10 @@ QVariant ChoiceModel::data(const QModelIndex &index, int role) const
         return choice.text;
     else if (role == NextNodeRole)
         return choice.nextNodeId;
+    else if (role == EnabledRole)
+        return choice.isEnabled;
+    else if (role == RequirementRole)
+        return choice.requirementText;
 
     return QVariant();
 }
@@ -37,6 +41,8 @@ QHash<int, QByteArray> ChoiceModel::roleNames() const
 {
     return {
         { TextRole, "text" },
-        { NextNodeRole, "nextNodeId" }
+        { NextNodeRole, "nextNodeId" },
+        { EnabledRole, "enabled" },
+        { RequirementRole, "requirement" }
     };
 }

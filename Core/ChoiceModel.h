@@ -4,6 +4,13 @@
 #include <QAbstractListModel>
 #include "Node.h"
 
+enum Roles {
+    TextRole = Qt::UserRole + 1,
+    NextNodeRole,
+    EnabledRole,
+    RequirementRole
+};
+
 class ChoiceModel : public QAbstractListModel
 {
     Q_OBJECT

@@ -3,14 +3,20 @@
 
 #include <QString>
 #include <QList>
+#include <QVariantMap>
 
 // =========================
 // Choice Struct
 // =========================
-struct Choice
-{
+struct Choice {
     QString text;
     int nextNodeId;
+
+    QVariantMap setFlags;
+    QVariantMap conditions;
+
+    bool isEnabled = true;
+    QString requirementText;
 };
 
 // =========================
