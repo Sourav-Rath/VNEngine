@@ -25,14 +25,20 @@ QVariant ChoiceModel::data(const QModelIndex &index, int role) const
 
     const Choice &choice = m_choices[index.row()];
 
-    if (role == TextRole)
+    switch (role)
+    {
+    case TextRole:
         return choice.text;
-    else if (role == NextNodeRole)
+
+    case NextNodeRole:
         return choice.nextNodeId;
-    else if (role == EnabledRole)
+
+    case EnabledRole:
         return choice.isEnabled;
-    else if (role == RequirementRole)
+
+    case RequirementRole:
         return choice.requirementText;
+    }
 
     return QVariant();
 }

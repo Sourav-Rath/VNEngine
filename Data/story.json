@@ -2,51 +2,39 @@
   "nodes": [
     {
       "id": 0,
-      "text": "You wake up in darkness.",
+      "text": "Start",
       "next": 1
     },
     {
       "id": 1,
-      "text": "You see a key on the ground.",
+      "text": "Choose action",
       "choices": [
         {
-          "text": "Pick up the key",
-          "next": 2,
+          "text": "Gain karma",
+          "next": 1,
           "setFlags": {
-            "hasKey": true
+            "karma": { "add": 2 }
           }
         },
         {
-          "text": "Ignore the key",
-          "next": 2
+          "text": "Lose karma",
+          "next": 1,
+          "setFlags": {
+            "karma": { "sub": 1 }
+          }
+        },
+        {
+          "text": "Open door",
+          "next": 2,
+          "conditions": {
+            "karma": { "gte": 4 }
+          }
         }
       ]
     },
     {
       "id": 2,
-      "text": "You reach a locked door.",
-      "choices": [
-        {
-          "text": "Open the door",
-          "next": 3,
-          "conditions": {
-            "hasKey": true
-          }
-        },
-        {
-          "text": "Break the door",
-          "next": 4
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "text": "You unlocked the door and escaped.",
-      "next": -1
-    },
-    {
-      "id": 4,
-      "text": "You failed to break the door and got caught.",
+      "text": "Door opened!",
       "next": -1
     }
   ]

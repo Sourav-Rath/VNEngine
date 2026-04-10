@@ -75,19 +75,69 @@ void DialogueManager::selectChoice(int index)
 
     Choice choice = node.choices[index];
 
-    // Validate condition
+    // Validate again (backend safety)
     evaluateChoice(choice);
     if (!choice.isEnabled)
     {
-        qDebug() << "Blocked choice due to unmet conditions";
+        qDebug() << "Blocked choice";
         return;
     }
 
     // Apply flags
     for (auto it = choice.setFlags.begin(); it != choice.setFlags.end(); ++it)
     {
-        qDebug() << "Setting flag:" << it.key() << "=" << it.value();
-        setFlag(it.key(), it.value());
+        QString key = it.key();
+        QVariant value = it.value();
+
+        QVariant current = m_state.value(key, 0);
+
+        //  If simple value → SET
+        if (!value.canConvert<QVariantMap>())
+        {
+            qDebug() << "SET:" << key << "=" << value;
+            setFlag(key, value);
+            continue;
+        }
+
+        QVariantMap opMap = value.toMap();
+
+        for (auto op = opMap.begin(); op != opMap.end(); ++op)
+        {
+            QString operation = op.key();
+            QVariant operand = op.value();
+
+            double curr = current.toDouble();
+            double val = operand.toDouble();
+
+            if (operation == "set")
+            {
+                current = operand;
+            }
+            else if (operation == "add")
+            {
+                current = curr + val;
+            }
+            else if (operation == "sub")
+            {
+                current = curr - val;
+            }
+            else if (operation == "mul")
+            {
+                current = curr * val;
+            }
+            else if (operation == "div")
+            {
+                if (val != 0)
+                    current = curr / val;
+            }
+            else
+            {
+                qDebug() << "Unknown operation:" << operation;
+            }
+        }
+
+        qDebug() << "Updated:" << key << "=" << current;
+        setFlag(key, current);
     }
 
     setCurrentNode(choice.nextNodeId);
@@ -167,32 +217,62 @@ bool DialogueManager::evaluateChoice(Choice& choice)
 
     for (auto it = choice.conditions.begin(); it != choice.conditions.end(); ++it)
     {
-        // Check if flag exists
-        if (!m_state.contains(it.key()))
+        QString key = it.key();
+
+        if (!m_state.contains(key))
         {
             valid = false;
-
-            requirements.append(
-                QString("%1 required (NOT SET / %2)")
-                    .arg(it.key())
-                    .arg(it.value().toString())
-                );
+            requirements.append(QString("%1 NOT SET").arg(key));
             continue;
         }
 
-        QVariant current = m_state.value(it.key());
+        QVariant current = m_state.value(key);
+        QVariantMap conditionMap = it.value().toMap();
 
-        // Strict comparison
-        if (current != it.value())
+        for (auto cond = conditionMap.begin(); cond != conditionMap.end(); ++cond)
         {
-            valid = false;
+            QString op = cond.key();
+            QVariant expected = cond.value();
 
-            requirements.append(
-                QString("%1 required (%2 / %3)")
-                    .arg(it.key())
-                    .arg(current.toString())
-                    .arg(it.value().toString())
-                );
+            bool result = true;
+
+            // 🔥 OPERATOR LOGIC
+            if (op == "eq")
+                result = (current == expected);
+
+            else if (op == "neq")
+                result = (current != expected);
+
+            else if (op == "gt")
+                result = (current.toDouble() > expected.toDouble());
+
+            else if (op == "gte")
+                result = (current.toDouble() >= expected.toDouble());
+
+            else if (op == "lt")
+                result = (current.toDouble() < expected.toDouble());
+
+            else if (op == "lte")
+                result = (current.toDouble() <= expected.toDouble());
+
+            else
+            {
+                result = false;
+                requirements.append(QString("Unknown op: %1").arg(op));
+            }
+
+            if (!result)
+            {
+                valid = false;
+
+                requirements.append(
+                    QString("%1 %2 %3 (current: %4)")
+                        .arg(key)
+                        .arg(op)
+                        .arg(expected.toString())
+                        .arg(current.toString())
+                    );
+            }
         }
     }
 
