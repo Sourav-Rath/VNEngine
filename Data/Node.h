@@ -15,6 +15,8 @@ struct Choice {
     QVariantMap setFlags;
     QVariantMap conditions;
 
+    QList<QVariantMap> events;
+
     bool isEnabled = true;
     QString requirementText;
 };
@@ -27,6 +29,7 @@ struct Node
     QString text;
     int nextNodeId;
     QList<Choice> choices;
+    QList<QVariantMap> events;
 };
 
 #endif // NODE_H

@@ -27,11 +27,11 @@ public:
     Q_INVOKABLE void next();
     Q_INVOKABLE void selectChoice(int index);
 
-    //  STATE SYSTEM
+    // STATE SYSTEM
     Q_INVOKABLE void setFlag(const QString& key, const QVariant& value);
     Q_INVOKABLE QVariant getFlag(const QString& key) const;
 
-    //Save, Load and Restart
+    // SAVE / LOAD / RESTART
     Q_INVOKABLE void saveGame();
     Q_INVOKABLE void loadGame();
     Q_INVOKABLE void restartGame();
@@ -40,10 +40,18 @@ signals:
     void dialogueChanged();
     void choicesChanged();
 
+    // EVENT SIGNALS
+    void eventPrint(QString message);
+    void eventLog(QString message);
+    void eventSound(QString file);
+
 private:
     void loadFromJson(const QString& path);
     void setCurrentNode(int nodeId);
     bool evaluateChoice(Choice& choice);
+
+    // EVENT SYSTEM
+    void executeEvents(const QList<QVariantMap>& events);
 
     QMap<int, Node> nodes;
     int currentNodeId = 0;

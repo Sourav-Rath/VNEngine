@@ -2,40 +2,71 @@
   "nodes": [
     {
       "id": 0,
-      "text": "Start",
+      "text": "You wake up in a dark room.",
       "next": 1
     },
+
     {
       "id": 1,
-      "text": "Choose action",
+      "text": "There is a key and a locked door.",
       "choices": [
+        {
+          "text": "Pick up the key",
+          "next": 1,
+          "setFlags": {
+            "hasKey": { "set": true }
+          },
+          "events": [
+            { "type": "print", "message": "You picked up the key." }
+          ]
+        },
         {
           "text": "Gain karma",
           "next": 1,
           "setFlags": {
             "karma": { "add": 2 }
-          }
+          },
+          "events": [
+            { "type": "print", "message": "You feel stronger." }
+          ]
         },
         {
-          "text": "Lose karma",
-          "next": 1,
-          "setFlags": {
-            "karma": { "sub": 1 }
-          }
-        },
-        {
-          "text": "Open door",
+          "text": "Open the door",
           "next": 2,
           "conditions": {
+            "hasKey": { "eq": true }
+          },
+          "events": [
+            { "type": "print", "message": "You unlock the door." }
+          ]
+        },
+        {
+          "text": "Force the door",
+          "next": 3,
+          "conditions": {
             "karma": { "gte": 4 }
-          }
+          },
+          "events": [
+            { "type": "log", "message": "You try to break it..." }
+          ]
         }
       ]
     },
+
     {
       "id": 2,
-      "text": "Door opened!",
-      "next": -1
+      "text": "The door opens. You escaped.",
+      "events": [
+        { "type": "print", "message": "Freedom!" }
+      ]
+    },
+
+    {
+      "id": 3,
+      "text": "You failed and got caught.",
+      "events": [
+        { "type": "print", "message": "Game Over." }
+      ]
     }
   ]
 }

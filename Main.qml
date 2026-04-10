@@ -38,7 +38,6 @@ ApplicationWindow {
 
             Button {
                 text: "Restart"
-
                 onClicked: {
                     console.log("Restarting...")
                     dialogueManager.restartGame()
@@ -48,7 +47,7 @@ ApplicationWindow {
         }
 
         // =========================
-        // STATUS TEXT (FEEDBACK)
+        // STATUS TEXT
         // =========================
         Text {
             id: statusText
@@ -65,6 +64,17 @@ ApplicationWindow {
             font.pixelSize: 24
             color: "white"
             wrapMode: Text.WordWrap
+        }
+
+        // =========================
+        //  EVENT TEXT (NEW)
+        // =========================
+        Text {
+            id: eventText
+            text: ""
+            color: "yellow"
+            font.pixelSize: 20
+            visible: false
         }
 
         // =========================
@@ -110,6 +120,28 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+    }
+
+    // =========================
+    //  EVENT CONNECTIONS (CORE STEP 19.2)
+    // =========================
+    Connections {
+        target: dialogueManager
+
+        function onEventPrint(message) {
+            console.log("QML PRINT:", message)
+            eventText.text = message
+            eventText.visible = true
+        }
+
+        function onEventLog(message) {
+            console.log("QML LOG:", message)
+        }
+
+        function onEventSound(file) {
+            console.log("QML SOUND:", file)
+            // sound system later
         }
     }
 }
