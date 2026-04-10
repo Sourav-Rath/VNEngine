@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QVariantMap>
+#include <QQueue>
 
 #include "Node.h"
 #include "ChoiceModel.h"
@@ -52,6 +53,9 @@ private:
 
     // EVENT SYSTEM
     void executeEvents(const QList<QVariantMap>& events);
+    void processNextEvent();
+
+    QQueue<QVariantMap> eventQueue;
 
     QMap<int, Node> nodes;
     int currentNodeId = 0;

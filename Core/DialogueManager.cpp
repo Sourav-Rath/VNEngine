@@ -1,5 +1,6 @@
 #include "DialogueManager.h"
 #include <QDebug>
+#include <QTimer>
 
 DialogueManager::DialogueManager(QObject *parent)
     : QObject(parent)
@@ -85,7 +86,7 @@ void DialogueManager::selectChoice(int index)
         return;
     }
 
-    // APPLY FLAGS (Step 17 system)
+    // APPLY FLAGS
     for (auto it = choice.setFlags.begin(); it != choice.setFlags.end(); ++it)
     {
         QString key = it.key();
@@ -119,10 +120,27 @@ void DialogueManager::selectChoice(int index)
         setFlag(key, current);
     }
 
-    //  CHOICE EVENTS
-    executeEvents(choice.events);
+    // 🔥 EVENT + TRANSITION SYSTEM
+    if (!choice.events.isEmpty())
+    {
+        eventQueue.clear();
 
-    setCurrentNode(choice.nextNodeId);
+        for (const QVariantMap& ev : choice.events)
+            eventQueue.enqueue(ev);
+
+        // push transition as LAST event
+        QVariantMap transition;
+        transition["type"] = "transition";
+        transition["nextNode"] = choice.nextNodeId;
+
+        eventQueue.enqueue(transition);
+
+        processNextEvent();
+    }
+    else
+    {
+        setCurrentNode(choice.nextNodeId);
+    }
 }
 
 void DialogueManager::setFlag(const QString& key, const QVariant& value)
@@ -158,7 +176,7 @@ void DialogueManager::loadFromJson(const QString &path)
         node.text = obj["text"].toString();
         node.nextNodeId = obj["nextNodeId"].toInt(obj["next"].toInt(-1));
 
-        //  NODE EVENTS PARSE
+        // NODE EVENTS
         if (obj.contains("events")) {
             QJsonArray eventsArray = obj["events"].toArray();
             for (const QJsonValue& ev : eventsArray)
@@ -180,7 +198,6 @@ void DialogueManager::loadFromJson(const QString &path)
             if (choiceObj.contains("conditions"))
                 choice.conditions = choiceObj["conditions"].toObject().toVariantMap();
 
-            //  CHOICE EVENTS PARSE
             if (choiceObj.contains("events")) {
                 QJsonArray eventsArray = choiceObj["events"].toArray();
                 for (const QJsonValue& ev : eventsArray)
@@ -233,94 +250,88 @@ bool DialogueManager::evaluateChoice(Choice& choice)
     return valid;
 }
 
-//  EVENT EXECUTOR
+// ================= EVENT SYSTEM =================
+
 void DialogueManager::executeEvents(const QList<QVariantMap>& events)
 {
-    for (const QVariantMap& ev : events)
-    {
-        QString type = ev.value("type").toString();
+    eventQueue.clear();
 
-        if (type == "print")
-        {
-            QString msg = ev.value("message").toString();
-            qDebug() << "EVENT:" << msg;
-            emit eventPrint(msg);   // send to QML
-        }
-        else if (type == "log")
-        {
-            QString msg = ev.value("message").toString();
-            qDebug() << "LOG:" << msg;
-            emit eventLog(msg);
-        }
-        else if (type == "sound")
-        {
-            QString file = ev.value("file").toString();
-            qDebug() << "PLAY SOUND:" << file;
-            emit eventSound(file);
-        }
-        else
-        {
-            qDebug() << "Unknown event:" << type;
-        }
+    for (const QVariantMap& ev : events)
+        eventQueue.enqueue(ev);
+
+    processNextEvent();
+}
+
+void DialogueManager::processNextEvent()
+{
+    if (eventQueue.isEmpty())
+        return;
+
+    QVariantMap ev = eventQueue.dequeue();
+    QString type = ev.value("type").toString();
+
+    if (type == "print")
+    {
+        emit eventPrint(ev.value("message").toString());
+        processNextEvent();
+    }
+    else if (type == "log")
+    {
+        emit eventLog(ev.value("message").toString());
+        processNextEvent();
+    }
+    else if (type == "sound")
+    {
+        emit eventSound(ev.value("file").toString());
+        processNextEvent();
+    }
+    else if (type == "delay")
+    {
+        int time = ev.value("time").toInt();
+
+        QTimer::singleShot(time, this, [this]() {
+            processNextEvent();
+        });
+    }
+    else if (type == "transition")
+    {
+        int nextNode = ev.value("nextNode").toInt();
+        setCurrentNode(nextNode);
+    }
+    else
+    {
+        qDebug() << "Unknown event:" << type;
+        processNextEvent();
     }
 }
 
-// =======================
-// SAVE GAME
-// =======================
+// ================= SAVE / LOAD =================
+
 void DialogueManager::saveGame()
 {
     QJsonObject saveObj;
-
     saveObj["currentNodeId"] = currentNodeId;
 
     QJsonObject stateObj;
     for (auto it = m_state.begin(); it != m_state.end(); ++it)
-    {
         stateObj[it.key()] = QJsonValue::fromVariant(it.value());
-    }
 
     saveObj["state"] = stateObj;
 
-    QJsonDocument doc(saveObj);
-
     QFile file("save.json");
-    if (!file.open(QIODevice::WriteOnly))
-    {
-        qDebug() << "Failed to save game";
-        return;
-    }
+    if (!file.open(QIODevice::WriteOnly)) return;
 
-    file.write(doc.toJson());
+    file.write(QJsonDocument(saveObj).toJson());
     file.close();
-
-    qDebug() << "Game saved!";
 }
 
-// =======================
-// LOAD GAME
-// =======================
 void DialogueManager::loadGame()
 {
     QFile file("save.json");
+    if (!file.open(QIODevice::ReadOnly)) return;
 
-    if (!file.exists())
-    {
-        qDebug() << "No save file found";
-        return;
-    }
-
-    if (!file.open(QIODevice::ReadOnly))
-    {
-        qDebug() << "Failed to open save file";
-        return;
-    }
-
-    QByteArray data = file.readAll();
+    QJsonObject saveObj = QJsonDocument::fromJson(file.readAll()).object();
     file.close();
-
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonObject saveObj = doc.object();
 
     currentNodeId = saveObj["currentNodeId"].toInt();
 
@@ -328,22 +339,13 @@ void DialogueManager::loadGame()
     QJsonObject stateObj = saveObj["state"].toObject();
 
     for (auto it = stateObj.begin(); it != stateObj.end(); ++it)
-    {
         m_state[it.key()] = it.value().toVariant();
-    }
 
     setCurrentNode(currentNodeId);
-
-    qDebug() << "Game loaded!";
 }
 
-// =======================
-// RESTART GAME
-// =======================
 void DialogueManager::restartGame()
 {
-    qDebug() << "Restarting game...";
-
     m_state.clear();
 
     nodes.clear();

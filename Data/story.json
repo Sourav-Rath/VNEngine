@@ -17,6 +17,8 @@
             "hasKey": { "set": true }
           },
           "events": [
+            { "type": "print", "message": "You reach down..." },
+            { "type": "delay", "time": 800 },
             { "type": "print", "message": "You picked up the key." }
           ]
         },
@@ -27,6 +29,8 @@
             "karma": { "add": 2 }
           },
           "events": [
+            { "type": "print", "message": "You focus..." },
+            { "type": "delay", "time": 800 },
             { "type": "print", "message": "You feel stronger." }
           ]
         },
@@ -37,7 +41,9 @@
             "hasKey": { "eq": true }
           },
           "events": [
-            { "type": "print", "message": "You unlock the door." }
+            { "type": "print", "message": "You insert the key..." },
+            { "type": "delay", "time": 1000 },
+            { "type": "print", "message": "The lock clicks open." }
           ]
         },
         {
@@ -47,7 +53,9 @@
             "karma": { "gte": 4 }
           },
           "events": [
-            { "type": "log", "message": "You try to break it..." }
+            { "type": "print", "message": "You charge at the door..." },
+            { "type": "delay", "time": 1000 },
+            { "type": "log", "message": "The door breaks open!" }
           ]
         }
       ]
@@ -57,6 +65,7 @@
       "id": 2,
       "text": "The door opens. You escaped.",
       "events": [
+        { "type": "delay", "time": 500 },
         { "type": "print", "message": "Freedom!" }
       ]
     },
@@ -65,6 +74,7 @@
       "id": 3,
       "text": "You failed and got caught.",
       "events": [
+        { "type": "delay", "time": 500 },
         { "type": "print", "message": "Game Over." }
       ]
     }
