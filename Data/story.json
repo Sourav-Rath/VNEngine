@@ -1,0 +1,27 @@
+{
+  "nodes": [
+    {
+      "id": 0,
+      "text": "You wake up in darkness.",
+      "next": 1
+    },
+    {
+      "id": 1,
+      "text": "Two paths lie ahead.",
+      "choices": [
+        { "text": "Go left", "next": 2 },
+        { "text": "Go right", "next": 3 }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "A monster appears.",
+      "next": -1
+    },
+    {
+      "id": 3,
+      "text": "You escaped safely.",
+      "next": -1
+    }
+  ]
+}
