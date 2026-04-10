@@ -281,3 +281,96 @@ bool DialogueManager::evaluateChoice(Choice& choice)
 
     return valid;
 }
+
+//Save Function
+void DialogueManager::saveGame()
+{
+    QJsonObject saveObj;
+
+    // Save current node
+    saveObj["currentNodeId"] = currentNodeId;
+
+    // Save state
+    QJsonObject stateObj;
+    for (auto it = m_state.begin(); it != m_state.end(); ++it)
+    {
+        stateObj[it.key()] = QJsonValue::fromVariant(it.value());
+    }
+
+    saveObj["state"] = stateObj;
+
+    QJsonDocument doc(saveObj);
+
+    QFile file("save.json");
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        qDebug() << "Failed to save game";
+        return;
+    }
+
+    file.write(doc.toJson());
+    file.close();
+
+    qDebug() << "Game saved!";
+}
+
+//Load Function
+void DialogueManager::loadGame()
+{
+    QFile file("save.json");
+
+    if (!file.exists())
+    {
+        qDebug() << "No save file found";
+        return;
+    }
+
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        qDebug() << "Failed to open save file";
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonObject saveObj = doc.object();
+
+    // Load node
+    currentNodeId = saveObj["currentNodeId"].toInt();
+
+    // Load state
+    m_state.clear();
+    QJsonObject stateObj = saveObj["state"].toObject();
+
+    for (auto it = stateObj.begin(); it != stateObj.end(); ++it)
+    {
+        m_state[it.key()] = it.value().toVariant();
+    }
+
+    // Apply node
+    setCurrentNode(currentNodeId);
+
+    qDebug() << "Game loaded!";
+}
+
+// Restart System
+void DialogueManager::restartGame()
+{
+    qDebug() << "Restarting game...";
+
+    //  Reset state
+    m_state.clear();
+
+    // Reload JSON fresh
+    nodes.clear();
+    loadFromJson(":/VNEngine/Data/story.json");
+
+    // Reset to first node
+    if (!nodes.isEmpty())
+    {
+        currentNodeId = 0;
+        setCurrentNode(0);
+    }
+}

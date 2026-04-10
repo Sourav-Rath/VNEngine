@@ -5,32 +5,70 @@ ApplicationWindow {
     visible: true
     width: 800
     height: 600
-
     color: "#202020"
 
     Column {
-        anchors.centerIn: parent
+        anchors.fill: parent
         spacing: 20
+        padding: 20
 
         // =========================
-        // Dialogue Text
+        // TOP BAR (SAVE / LOAD / RESTART)
+        // =========================
+        Row {
+            spacing: 10
+
+            Button {
+                text: "Save"
+                onClicked: {
+                    console.log("Saving game...")
+                    dialogueManager.saveGame()
+                    statusText.text = "Game Saved"
+                }
+            }
+
+            Button {
+                text: "Load"
+                onClicked: {
+                    console.log("Loading game...")
+                    dialogueManager.loadGame()
+                    statusText.text = "Game Loaded"
+                }
+            }
+
+            Button {
+                text: "Restart"
+
+                onClicked: {
+                    console.log("Restarting...")
+                    dialogueManager.restartGame()
+                    statusText.text = "Game Restarted"
+                }
+            }
+        }
+
+        // =========================
+        // STATUS TEXT (FEEDBACK)
+        // =========================
+        Text {
+            id: statusText
+            text: ""
+            color: "lightgreen"
+            font.pixelSize: 14
+        }
+
+        // =========================
+        // DIALOGUE TEXT
         // =========================
         Text {
             text: dialogueManager.currentText
             font.pixelSize: 24
             color: "white"
+            wrapMode: Text.WordWrap
         }
 
         // =========================
-        // DEBUG
-        // =========================
-        Text {
-            text: "Model size: " + dialogueManager.choicesModel.rowCount()
-            color: "red"
-        }
-
-        // =========================
-        // NEXT BUTTON (only when no choices)
+        // NEXT BUTTON
         // =========================
         Button {
             text: "Next"
@@ -38,8 +76,10 @@ ApplicationWindow {
             visible: dialogueManager.choicesModel.rowCount() === 0
 
             onClicked: {
-                if (dialogueManager.choicesModel.rowCount() === 0)
+                if (dialogueManager.choicesModel.rowCount() === 0) {
+                    console.log("Next pressed")
                     dialogueManager.next()
+                }
             }
         }
 
@@ -53,15 +93,20 @@ ApplicationWindow {
                 model: dialogueManager.choicesModel
 
                 delegate: Button {
-                    //  show requirement text
-                    text: model.text + (model.enabled ? "" : " (" + model.requirement + ")")
+                    width: 400
 
-                    //  disable button
+                    text: model.text +
+                          (model.enabled ? "" : " (" + model.requirement + ")")
+
                     enabled: model.enabled
 
                     onClicked: {
+                        console.log("Choice clicked:", model.text, "Index:", index)
+
                         if (model.enabled)
                             dialogueManager.selectChoice(index)
+                        else
+                            console.log("Blocked choice")
                     }
                 }
             }

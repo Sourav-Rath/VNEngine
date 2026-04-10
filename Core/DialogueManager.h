@@ -31,6 +31,11 @@ public:
     Q_INVOKABLE void setFlag(const QString& key, const QVariant& value);
     Q_INVOKABLE QVariant getFlag(const QString& key) const;
 
+    //Save, Load and Restart
+    Q_INVOKABLE void saveGame();
+    Q_INVOKABLE void loadGame();
+    Q_INVOKABLE void restartGame();
+
 signals:
     void dialogueChanged();
     void choicesChanged();
