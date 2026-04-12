@@ -168,6 +168,55 @@ bool DialogueManager::evaluateCondition(const QVariantMap& condition)
     return true;
 }
 
+QString DialogueManager::buildRequirementText(const QVariantMap& condition)
+{
+    // GROUP CASE (AND / OR)
+    if (condition.contains("logic") && condition.contains("rules"))
+    {
+        QString logic = condition.value("logic").toString();
+        QVariantList rules = condition.value("rules").toList();
+
+        QStringList parts;
+
+        for (const QVariant& rule : rules)
+        {
+            parts.append(buildRequirementText(rule.toMap()));
+        }
+
+        QString joiner = (logic == "AND") ? " AND " : " OR ";
+
+        return "(" + parts.join(joiner) + ")";
+    }
+
+    // SIMPLE CASE
+    QStringList parts;
+
+    for (auto it = condition.begin(); it != condition.end(); ++it)
+    {
+        QString key = it.key();
+        QVariantMap ops = it.value().toMap();
+
+        for (auto op = ops.begin(); op != ops.end(); ++op)
+        {
+            QString type = op.key();
+            QVariant value = op.value();
+
+            QString text;
+
+            if (type == "eq") text = key;
+            else if (type == "neq") text = key + " ≠ " + value.toString();
+            else if (type == "gte") text = key + " ≥ " + value.toString();
+            else if (type == "lte") text = key + " ≤ " + value.toString();
+            else if (type == "gt") text = key + " > " + value.toString();
+            else if (type == "lt") text = key + " < " + value.toString();
+
+            parts.append(text);
+        }
+    }
+
+    return parts.join(" AND ");
+}
+
 // ================= CHOICE =================
 
 void DialogueManager::evaluateChoice(Choice& choice)
@@ -181,7 +230,13 @@ void DialogueManager::evaluateChoice(Choice& choice)
     if (!evaluateCondition(choice.conditions))
     {
         choice.isEnabled = false;
-        choice.requirement = "Requirements not met";
+
+        QString text = buildRequirementText(choice.conditions);
+
+        if (text.isEmpty())
+            choice.requirement = "Requirements not met";
+        else
+            choice.requirement = "Need " + text;
     }
 }
 

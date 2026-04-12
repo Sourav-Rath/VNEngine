@@ -18,6 +18,7 @@ class DialogueManager : public QObject
 public:
     explicit DialogueManager(QObject *parent = nullptr);
 
+    QString buildRequirementText(const QVariantMap& condition);
     QString currentText() const;
     ChoiceModel* choicesModel();
 
