@@ -74,6 +74,9 @@ bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
     QString logic = group.value("logic", "AND").toString();
     QVariantList rules = group.value("rules").toList();
 
+    qDebug() << "[GROUP] Logic:" << logic
+             << "| Rules:" << rules.size();
+
     if (rules.isEmpty())
         return true;
 
@@ -82,7 +85,10 @@ bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
         for (const QVariant& ruleVar : rules)
         {
             if (!evaluateCondition(ruleVar.toMap()))
+            {
+                qDebug() << "[GROUP FAIL - AND]";
                 return false;
+            }
         }
         return true;
     }
@@ -91,11 +97,17 @@ bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
         for (const QVariant& ruleVar : rules)
         {
             if (evaluateCondition(ruleVar.toMap()))
+            {
+                qDebug() << "[GROUP PASS - OR]";
                 return true;
+            }
         }
+
+        qDebug() << "[GROUP FAIL - OR]";
         return false;
     }
 
+    qDebug() << "[WARNING] Unknown logic type:" << logic;
     return true;
 }
 
@@ -115,6 +127,12 @@ bool DialogueManager::evaluateCondition(const QVariantMap& condition)
             QString type = op.key();
             QVariant required = op.value();
 
+            qDebug() << "[CHECK]"
+                     << key
+                     << type
+                     << required
+                     << "| Current:" << current;
+
             bool passed = true;
 
             if (type == "eq") passed = (current == required);
@@ -123,9 +141,27 @@ bool DialogueManager::evaluateCondition(const QVariantMap& condition)
             else if (type == "lte") passed = (current.toInt() <= required.toInt());
             else if (type == "gt") passed = (current.toInt() > required.toInt());
             else if (type == "lt") passed = (current.toInt() < required.toInt());
-
-            if (!passed)
+            else
+            {
+                qDebug() << "[ERROR] Invalid operator:" << type
+                         << "for key:" << key;
                 return false;
+            }
+
+            if (passed)
+            {
+                qDebug() << "[PASS]" << key;
+            }
+            else
+            {
+                qDebug() << "[FAIL]"
+                         << key
+                         << type
+                         << required
+                         << "| Current:" << current;
+
+                return false;
+            }
         }
     }
 
@@ -151,7 +187,6 @@ void DialogueManager::evaluateChoice(Choice& choice)
 
 void DialogueManager::selectChoice(int index)
 {
-    // HARD LOCK FIRST
     if (m_inputLocked)
         return;
 
@@ -176,13 +211,11 @@ void DialogueManager::selectChoice(int index)
         return;
     }
 
-    // APPLY FLAGS
     for (auto it = choice.setFlags.begin(); it != choice.setFlags.end(); ++it)
     {
         setFlag(it.key(), it.value());
     }
 
-    // EVENTS
     if (!choice.events.isEmpty())
     {
         executeEvents(choice.events);
@@ -302,9 +335,23 @@ void DialogueManager::loadFromJson(const QString& path)
     QByteArray data = file.readAll();
     file.close();
 
-    QJsonDocument doc = QJsonDocument::fromJson(data);
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+
+    if (error.error != QJsonParseError::NoError)
+    {
+        qDebug() << "[JSON ERROR]" << error.errorString();
+        return;
+    }
 
     QJsonObject root = doc.object();
+
+    if (!root.contains("nodes"))
+    {
+        qDebug() << "[JSON ERROR] Missing 'nodes' key";
+        return;
+    }
+
     QJsonArray array = root["nodes"].toArray();
 
     for (const QJsonValue& val : array)
@@ -330,9 +377,14 @@ void DialogueManager::loadFromJson(const QString& path)
 
                 if (cObj.contains("conditions"))
                 {
+                    if (!cObj["conditions"].isObject())
+                    {
+                        qDebug() << "[ERROR] Conditions must be object in choice:"
+                                 << choice.text;
+                    }
+
                     QJsonObject condObj = cObj["conditions"].toObject();
 
-                    // 🔥 IMPORTANT: SUPPORT BOTH SIMPLE + ADVANCED
                     if (condObj.contains("logic"))
                     {
                         choice.conditions = condObj.toVariantMap();
