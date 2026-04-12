@@ -4,13 +4,6 @@
 #include <QAbstractListModel>
 #include "Node.h"
 
-enum Roles {
-    TextRole = Qt::UserRole + 1,
-    NextNodeRole,
-    EnabledRole,
-    RequirementRole
-};
-
 class ChoiceModel : public QAbstractListModel
 {
     Q_OBJECT
@@ -18,7 +11,9 @@ class ChoiceModel : public QAbstractListModel
 public:
     enum Roles {
         TextRole = Qt::UserRole + 1,
-        NextNodeRole
+        NextNodeRole,
+        EnabledRole,
+        RequirementRole
     };
 
     explicit ChoiceModel(QObject *parent = nullptr);
@@ -27,6 +22,7 @@ public:
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role) const override;
+    QList<Choice> getChoices() const { return m_choices; }
 
 protected:
     QHash<int, QByteArray> roleNames() const override;

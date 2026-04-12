@@ -1,19 +1,31 @@
 #include "DialogueManager.h"
-#include <QDebug>
+
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QTimer>
+#include <QDebug>
+
+// ================= CONSTRUCTOR =================
 
 DialogueManager::DialogueManager(QObject *parent)
     : QObject(parent)
 {
     m_state.clear();
-
     m_choiceModel.setChoices({});
+
     loadFromJson(":/VNEngine/Data/story.json");
 
+    qDebug() << "Exists:"
+             << QFile::exists(":/VNEngine/Data/story.json");
+
     if (!nodes.isEmpty()) {
-        setCurrentNode(0);
+        setCurrentNode(nodes.firstKey());
     }
 }
+
+// ================= BASIC =================
 
 QString DialogueManager::currentText() const
 {
@@ -28,6 +40,8 @@ ChoiceModel* DialogueManager::choicesModel()
     return &m_choiceModel;
 }
 
+// ================= NODE =================
+
 void DialogueManager::setCurrentNode(int nodeId)
 {
     if (!nodes.contains(nodeId)) {
@@ -37,115 +51,201 @@ void DialogueManager::setCurrentNode(int nodeId)
 
     currentNodeId = nodeId;
 
-    const Node &node = nodes[currentNodeId];
+    const Node& node = nodes[currentNodeId];
 
-    // NODE EVENTS
-    executeEvents(node.events);
-
-    QList<Choice> processedChoices;
+    QList<Choice> processed;
 
     for (Choice choice : node.choices)
     {
         evaluateChoice(choice);
-        processedChoices.append(choice);
+        processed.append(choice);
     }
 
-    m_choiceModel.setChoices(processedChoices);
+    m_choiceModel.setChoices(processed);
 
     emit dialogueChanged();
     emit choicesChanged();
+
+    if (!node.events.isEmpty())
+        executeEvents(node.events);
 }
 
-void DialogueManager::next()
+// ================= CHOICE =================
+
+void DialogueManager::evaluateChoice(Choice& choice)
 {
-    if (!nodes.contains(currentNodeId))
-        return;
+    choice.isEnabled = true;
+    choice.requirement = "";
 
-    int nextId = nodes[currentNodeId].nextNodeId;
+    for (auto it = choice.conditions.begin(); it != choice.conditions.end(); ++it)
+    {
+        QVariant current = m_state.value(it.key(), QVariant());
+        QVariant required = it.value();
 
-    if (nextId != -1)
-        setCurrentNode(nextId);
+        // 🔥 INT → >= comparison
+        if (current.canConvert<int>() && required.canConvert<int>())
+        {
+            if (current.toInt() < required.toInt())
+            {
+                choice.isEnabled = false;
+                choice.requirement = it.key() + ": " + required.toString();
+                return;
+            }
+        }
+        // 🔥 BOOL / OTHER → equality
+        else
+        {
+            if (current != required)
+            {
+                choice.isEnabled = false;
+                choice.requirement = it.key() + ": " + required.toString();
+                return;
+            }
+        }
+    }
 }
 
 void DialogueManager::selectChoice(int index)
 {
-    if (!nodes.contains(currentNodeId))
-        return;
+    const QList<Choice>& choices = m_choiceModel.getChoices();
 
-    const Node& node = nodes[currentNodeId];
-
-    if (index < 0 || index >= node.choices.size())
-        return;
-
-    Choice choice = node.choices[index];
-
-    evaluateChoice(choice);
-    if (!choice.isEnabled)
+    if (index < 0 || index >= choices.size())
     {
-        qDebug() << "Blocked choice";
+        m_inputLocked = false;
+        emit inputLockedChanged();
         return;
     }
+
+    Choice choice = choices[index];
+
+    if (!choice.isEnabled)
+    {
+        m_inputLocked = false;
+        emit inputLockedChanged();
+        return;
+    }
+
 
     // APPLY FLAGS
     for (auto it = choice.setFlags.begin(); it != choice.setFlags.end(); ++it)
     {
-        QString key = it.key();
-        QVariant value = it.value();
-
-        QVariant current = m_state.value(key, 0);
-
-        if (!value.canConvert<QVariantMap>())
-        {
-            setFlag(key, value);
-            continue;
-        }
-
-        QVariantMap opMap = value.toMap();
-
-        for (auto op = opMap.begin(); op != opMap.end(); ++op)
-        {
-            QString operation = op.key();
-            QVariant operand = op.value();
-
-            double curr = current.toDouble();
-            double val = operand.toDouble();
-
-            if (operation == "set") current = operand;
-            else if (operation == "add") current = curr + val;
-            else if (operation == "sub") current = curr - val;
-            else if (operation == "mul") current = curr * val;
-            else if (operation == "div" && val != 0) current = curr / val;
-        }
-
-        setFlag(key, current);
+        setFlag(it.key(), it.value());
     }
 
-    // 🔥 EVENT + TRANSITION SYSTEM
     if (!choice.events.isEmpty())
     {
-        eventQueue.clear();
+        executeEvents(choice.events);
 
-        for (const QVariantMap& ev : choice.events)
-            eventQueue.enqueue(ev);
-
-        // push transition as LAST event
         QVariantMap transition;
         transition["type"] = "transition";
         transition["nextNode"] = choice.nextNodeId;
 
         eventQueue.enqueue(transition);
-
-        processNextEvent();
     }
     else
     {
         setCurrentNode(choice.nextNodeId);
+
+        // UNLOCK because no event system will handle it
+        m_inputLocked = false;
+        emit inputLockedChanged();
+
     }
 }
 
+// ================= EVENTS =================
+
+void DialogueManager::executeEvents(const QList<QVariantMap>& events)
+{
+
+    for (const auto& ev : events)
+        eventQueue.enqueue(ev);
+
+    m_inputLocked = true;
+    emit inputLockedChanged();
+
+    QTimer::singleShot(0, this, [this]() {
+        processNextEvent();
+    });
+}
+
+void DialogueManager::processNextEvent()
+{
+    if (eventQueue.isEmpty())
+    {
+        // UNLOCK INPUT HERE
+        m_inputLocked = false;
+        emit inputLockedChanged();
+        return;
+    }
+
+    QVariantMap ev = eventQueue.dequeue();
+    QString type = ev["type"].toString();
+
+    if (type == "print")
+    {
+        emit eventPrint(ev["message"].toString());
+        QTimer::singleShot(0, this, [this]() {
+    processNextEvent();
+});
+    }
+    else if (type == "log")
+    {
+        emit eventLog(ev["message"].toString());
+        QTimer::singleShot(0, this, [this]() {
+        processNextEvent();
+});
+    }
+    else if (type == "sound")
+    {
+        emit eventSound(ev["file"].toString());
+        QTimer::singleShot(0, this, [this]() {
+        processNextEvent();
+});
+    }
+    else if (type == "delay")
+    {
+        int time = ev["time"].toInt();
+
+        QTimer::singleShot(time, this, [this]() {
+            QTimer::singleShot(0, this, [this]() {
+            processNextEvent();
+});
+        });
+    }
+    else if (type == "transition")
+    {
+        int nextNode = ev["nextNode"].toInt();
+
+        setCurrentNode(nextNode);
+
+        QTimer::singleShot(0, this, [this]() {
+        processNextEvent();
+});
+    }
+}
+
+// ================= STATE =================
+
 void DialogueManager::setFlag(const QString& key, const QVariant& value)
 {
-    m_state[key] = value;
+    // BOOL → overwrite
+    if (value.typeId() == QMetaType::Bool)
+    {
+        m_state[key] = value;
+    }
+    // INT → stack
+    else if (value.canConvert<int>())
+    {
+        int current = m_state.value(key, 0).toInt();
+        m_state[key] = current + value.toInt();
+    }
+    else
+    {
+        m_state[key] = value;
+    }
+
+    qDebug() << "FLAG SET:" << key << "=" << m_state[key];
 }
 
 QVariant DialogueManager::getFlag(const QString& key) const
@@ -153,207 +253,176 @@ QVariant DialogueManager::getFlag(const QString& key) const
     return m_state.value(key, QVariant());
 }
 
-void DialogueManager::loadFromJson(const QString &path)
+// ================= JSON =================
+
+void DialogueManager::loadFromJson(const QString& path)
 {
+    nodes.clear();
+
     QFile file(path);
 
     if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << "Failed to open JSON:" << path;
+        qDebug() << "FAILED TO OPEN JSON:" << path;
         return;
     }
 
-    QByteArray data = file.readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    QJsonObject root = doc.object();
-    QJsonArray jsonNodes = root["nodes"].toArray();
+    qDebug() << "SUCCESSFULLY OPENED JSON:" << path;
 
-    for (const QJsonValue &value : jsonNodes) {
-        QJsonObject obj = value.toObject();
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
+
+    if (error.error != QJsonParseError::NoError) {
+        qDebug() << "JSON Parse Error:" << error.errorString();
+        return;
+    }
+
+    if (!doc.isObject()) {
+        qDebug() << "JSON root is not object!";
+        return;
+    }
+
+    QJsonObject root = doc.object();
+
+    if (!root.contains("nodes")) {
+        qDebug() << "JSON missing 'nodes' key!";
+        return;
+    }
+
+    QJsonArray array = root["nodes"].toArray();
+
+    for (const QJsonValue& val : array) {
+        QJsonObject obj = val.toObject();
 
         Node node;
-        int id = obj["id"].toInt();
-
+        node.id = obj["id"].toInt();
         node.text = obj["text"].toString();
-        node.nextNodeId = obj["nextNodeId"].toInt(obj["next"].toInt(-1));
 
-        // NODE EVENTS
-        if (obj.contains("events")) {
-            QJsonArray eventsArray = obj["events"].toArray();
-            for (const QJsonValue& ev : eventsArray)
-                node.events.append(ev.toObject().toVariantMap());
-        }
+        node.nextNodeId = obj.contains("next")
+                              ? obj["next"].toInt()
+                              : -1;
 
-        QJsonArray choicesArray = obj["choices"].toArray();
+        // CHOICES
+        if (obj.contains("choices")) {
+            QJsonArray choicesArray = obj["choices"].toArray();
 
-        for (const QJsonValue &choiceVal : choicesArray) {
-            QJsonObject choiceObj = choiceVal.toObject();
+            for (const QJsonValue& cVal : choicesArray) {
+                QJsonObject cObj = cVal.toObject();
 
-            Choice choice;
-            choice.text = choiceObj["text"].toString();
-            choice.nextNodeId = choiceObj["nextNodeId"].toInt(choiceObj["next"].toInt());
+                Choice choice;
+                choice.text = cObj["text"].toString();
+                choice.nextNodeId = cObj["next"].toInt();
 
-            if (choiceObj.contains("setFlags"))
-                choice.setFlags = choiceObj["setFlags"].toObject().toVariantMap();
+                // CONDITIONS
+                if (cObj.contains("conditions")) {
+                    QJsonObject condObj = cObj["conditions"].toObject();
+                    for (auto it = condObj.begin(); it != condObj.end(); ++it)
+                        choice.conditions[it.key()] = it.value().toVariant();
+                }
 
-            if (choiceObj.contains("conditions"))
-                choice.conditions = choiceObj["conditions"].toObject().toVariantMap();
+                // FLAGS
+                if (cObj.contains("setFlags")) {
+                    QJsonObject flagObj = cObj["setFlags"].toObject();
+                    for (auto it = flagObj.begin(); it != flagObj.end(); ++it)
+                        choice.setFlags[it.key()] = it.value().toVariant();
+                }
 
-            if (choiceObj.contains("events")) {
-                QJsonArray eventsArray = choiceObj["events"].toArray();
-                for (const QJsonValue& ev : eventsArray)
-                    choice.events.append(ev.toObject().toVariantMap());
+                node.choices.append(choice);
             }
-
-            node.choices.append(choice);
         }
 
-        nodes[id] = node;
+        nodes[node.id] = node;
     }
 
     qDebug() << "Loaded nodes:" << nodes.size();
 }
 
-bool DialogueManager::evaluateChoice(Choice& choice)
+// ================= NAV =================
+
+void DialogueManager::next()
 {
-    if (choice.conditions.isEmpty())
-    {
-        choice.isEnabled = true;
-        return true;
-    }
+    qDebug() << "NEXT FUNCTION CALLED";
 
-    bool valid = true;
-
-    for (auto it = choice.conditions.begin(); it != choice.conditions.end(); ++it)
-    {
-        QString key = it.key();
-
-        if (!m_state.contains(key))
-        {
-            valid = false;
-            continue;
-        }
-
-        QVariant current = m_state.value(key);
-        QVariantMap conditionMap = it.value().toMap();
-
-        for (auto cond = conditionMap.begin(); cond != conditionMap.end(); ++cond)
-        {
-            QString op = cond.key();
-            QVariant expected = cond.value();
-
-            if (op == "eq" && current != expected) valid = false;
-            else if (op == "gte" && current.toDouble() < expected.toDouble()) valid = false;
-        }
-    }
-
-    choice.isEnabled = valid;
-    return valid;
-}
-
-// ================= EVENT SYSTEM =================
-
-void DialogueManager::executeEvents(const QList<QVariantMap>& events)
-{
-    eventQueue.clear();
-
-    for (const QVariantMap& ev : events)
-        eventQueue.enqueue(ev);
-
-    processNextEvent();
-}
-
-void DialogueManager::processNextEvent()
-{
-    if (eventQueue.isEmpty())
+    if (!nodes.contains(currentNodeId)) {
+        qDebug() << "Node not found!";
         return;
+    }
 
-    QVariantMap ev = eventQueue.dequeue();
-    QString type = ev.value("type").toString();
+    int nextId = nodes[currentNodeId].nextNodeId;
 
-    if (type == "print")
-    {
-        emit eventPrint(ev.value("message").toString());
-        processNextEvent();
-    }
-    else if (type == "log")
-    {
-        emit eventLog(ev.value("message").toString());
-        processNextEvent();
-    }
-    else if (type == "sound")
-    {
-        emit eventSound(ev.value("file").toString());
-        processNextEvent();
-    }
-    else if (type == "delay")
-    {
-        int time = ev.value("time").toInt();
+    qDebug() << "Current:" << currentNodeId
+             << "Next:" << nextId;
 
-        QTimer::singleShot(time, this, [this]() {
-            processNextEvent();
-        });
-    }
-    else if (type == "transition")
-    {
-        int nextNode = ev.value("nextNode").toInt();
-        setCurrentNode(nextNode);
-    }
-    else
-    {
-        qDebug() << "Unknown event:" << type;
-        processNextEvent();
-    }
+    if (nextId != -1)
+        setCurrentNode(nextId);
 }
 
 // ================= SAVE / LOAD =================
 
 void DialogueManager::saveGame()
 {
-    QJsonObject saveObj;
-    saveObj["currentNodeId"] = currentNodeId;
+    QJsonObject saveData;
+
+    saveData["currentNode"] = currentNodeId;
 
     QJsonObject stateObj;
     for (auto it = m_state.begin(); it != m_state.end(); ++it)
         stateObj[it.key()] = QJsonValue::fromVariant(it.value());
 
-    saveObj["state"] = stateObj;
+    saveData["state"] = stateObj;
 
     QFile file("save.json");
-    if (!file.open(QIODevice::WriteOnly)) return;
+    if (!file.open(QIODevice::WriteOnly)) {
+        qDebug() << "Save failed!";
+        return;
+    }
 
-    file.write(QJsonDocument(saveObj).toJson());
+    file.write(QJsonDocument(saveData).toJson());
     file.close();
+
+    qDebug() << "Game Saved";
 }
 
 void DialogueManager::loadGame()
 {
     QFile file("save.json");
-    if (!file.open(QIODevice::ReadOnly)) return;
 
-    QJsonObject saveObj = QJsonDocument::fromJson(file.readAll()).object();
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "No save file!";
+        return;
+    }
+
+    QByteArray data = file.readAll();
     file.close();
 
-    currentNodeId = saveObj["currentNodeId"].toInt();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+
+    if (!doc.isObject()) {
+        qDebug() << "Invalid save file!";
+        return;
+    }
+
+    QJsonObject saveData = doc.object();
+
+    currentNodeId = saveData["currentNode"].toInt();
 
     m_state.clear();
-    QJsonObject stateObj = saveObj["state"].toObject();
 
+    QJsonObject stateObj = saveData["state"].toObject();
     for (auto it = stateObj.begin(); it != stateObj.end(); ++it)
         m_state[it.key()] = it.value().toVariant();
 
     setCurrentNode(currentNodeId);
+
+    qDebug() << "Game Loaded";
 }
 
 void DialogueManager::restartGame()
 {
     m_state.clear();
 
-    nodes.clear();
-    loadFromJson(":/VNEngine/Data/story.json");
-
     if (!nodes.isEmpty())
-    {
-        currentNodeId = 0;
-        setCurrentNode(0);
-    }
+        setCurrentNode(nodes.firstKey());
 }

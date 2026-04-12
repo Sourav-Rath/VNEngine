@@ -1,35 +1,33 @@
-#ifndef NODE_H
-#define NODE_H
+#pragma once
 
 #include <QString>
 #include <QList>
-#include <QVariantMap>
+#include <QMap>
+#include <QVariant>
 
-// =========================
-// Choice Struct
-// =========================
-struct Choice {
-    QString text;
-    int nextNodeId;
-
-    QVariantMap setFlags;
-    QVariantMap conditions;
-
-    QList<QVariantMap> events;
-
-    bool isEnabled = true;
-    QString requirementText;
-};
-
-// =========================
-// Node Struct
-// =========================
-struct Node
+struct Choice
 {
     QString text;
-    int nextNodeId;
-    QList<Choice> choices;
+    int nextNodeId = -1;
+
+    bool isEnabled = true;
+    QString requirement;
+
+    QMap<QString, QVariant> conditions;
+    QMap<QString, QVariant> setFlags;
+
     QList<QVariantMap> events;
 };
 
-#endif // NODE_H
+struct Node
+{
+    int id = -1;   // ✅ THIS WAS MISSING
+
+    QString text;
+
+    QList<Choice> choices;
+
+    int nextNodeId = -1;
+
+    QList<QVariantMap> events;
+};

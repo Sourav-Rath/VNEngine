@@ -10,11 +10,10 @@ int main(int argc, char *argv[]) {
 
     QQmlApplicationEngine engine;
 
-    DialogueManager dialogueManager;
+    DialogueManager* dialogueManager = new DialogueManager(&engine);
+    engine.rootContext()->setContextProperty("dialogueManager", dialogueManager);
 
-    engine.rootContext()->setContextProperty("dialogueManager", &dialogueManager);
-
-    engine.loadFromModule("VNEngine", "Main");
+    engine.load(QUrl("qrc:/VNEngine/Main.qml"));
 
     return app.exec();
 }

@@ -37,7 +37,7 @@ QVariant ChoiceModel::data(const QModelIndex &index, int role) const
         return choice.isEnabled;
 
     case RequirementRole:
-        return choice.requirementText;
+        return choice.requirement;
     }
 
     return QVariant();

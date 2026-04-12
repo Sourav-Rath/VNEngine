@@ -5,22 +5,28 @@ project(VNEngine VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# =========================
-# Find Qt
-# =========================
 find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup()
 
 # =========================
-# Create executable
+# EXECUTABLE
 # =========================
 qt_add_executable(appVNEngine
     main.cpp
+
+    Core/DialogueManager.cpp
+    Core/DialogueManager.h
+
+    Core/ChoiceModel.cpp
+    Core/ChoiceModel.h
+
+
+    Data/Node.h
 )
 
 # =========================
-# IMPORTANT: Include paths (FIXES Node.h issue)
+# INCLUDE PATHS
 # =========================
 target_include_directories(appVNEngine PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core
@@ -28,26 +34,7 @@ target_include_directories(appVNEngine PRIVATE
 )
 
 # =========================
-# Source files
-# =========================
-target_sources(appVNEngine PRIVATE
-
-    Core/ChoiceModel.cpp
-    Core/DialogueManager.cpp
-)
-
-# =========================
-# Header files
-# =========================
-target_sources(appVNEngine PRIVATE
-
-    Core/ChoiceModel.h
-    Core/DialogueManager.h
-    Data/Node.h
-)
-
-# =========================
-# QML Module
+# QML MODULE + RESOURCES
 # =========================
 qt_add_qml_module(appVNEngine
     URI VNEngine
@@ -61,16 +48,6 @@ qt_add_qml_module(appVNEngine
 )
 
 # =========================
-# Link Qt
+# LINK
 # =========================
-target_link_libraries(appVNEngine
-    PRIVATE Qt6::Quick
-)
-
-# =========================
-# App properties
-# =========================
-set_target_properties(appVNEngine PROPERTIES
-    MACOSX_BUNDLE TRUE
-    WIN32_EXECUTABLE TRUE
-)
+target_link_libraries(appVNEngine PRIVATE Qt6::Quick)

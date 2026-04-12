@@ -60,14 +60,14 @@ ApplicationWindow {
         // DIALOGUE TEXT
         // =========================
         Text {
-            text: dialogueManager.currentText
+            text: dialogueManager ? dialogueManager.currentText : ""
             font.pixelSize: 24
             color: "white"
             wrapMode: Text.WordWrap
         }
 
         // =========================
-        //  EVENT TEXT (NEW)
+        // EVENT TEXT
         // =========================
         Text {
             id: eventText
@@ -83,13 +83,14 @@ ApplicationWindow {
         Button {
             text: "Next"
 
-            visible: dialogueManager.choicesModel.rowCount() === 0
+            enabled: dialogueManager ? !dialogueManager.inputLocked : false
+            opacity: enabled ? 1.0 : 0.4
 
             onClicked: {
-                if (dialogueManager.choicesModel.rowCount() === 0) {
-                    console.log("Next pressed")
-                    dialogueManager.next()
-                }
+                if (!enabled)
+                    return;
+
+                dialogueManager.next()
             }
         }
 
@@ -100,7 +101,7 @@ ApplicationWindow {
             spacing: 10
 
             Repeater {
-                model: dialogueManager.choicesModel
+                model: dialogueManager ? dialogueManager.choicesModel : null
 
                 delegate: Button {
                     width: 400
@@ -108,15 +109,28 @@ ApplicationWindow {
                     text: model.text +
                           (model.enabled ? "" : " (" + model.requirement + ")")
 
-                    enabled: model.enabled
+                    enabled: dialogueManager
+                             ? (model.enabled && !dialogueManager.inputLocked)
+                             : false
+
+                    background: Rectangle {
+                        color: enabled ? "#e0e0e0" : "#555555"
+                        radius: 4
+                    }
+
+                    contentItem: Text {
+                        text: model.text +
+                              (model.enabled ? "" : " (" + model.requirement + ")")
+                        color: enabled ? "black" : "#bbbbbb"
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
 
                     onClicked: {
-                        console.log("Choice clicked:", model.text, "Index:", index)
+                        if (!enabled)
+                            return;
 
-                        if (model.enabled)
-                            dialogueManager.selectChoice(index)
-                        else
-                            console.log("Blocked choice")
+                        dialogueManager.selectChoice(index)
                     }
                 }
             }
@@ -124,7 +138,7 @@ ApplicationWindow {
     }
 
     // =========================
-    //  EVENT CONNECTIONS (CORE STEP 19.2)
+    // EVENT CONNECTIONS
     // =========================
     Connections {
         target: dialogueManager
@@ -141,7 +155,6 @@ ApplicationWindow {
 
         function onEventSound(file) {
             console.log("QML SOUND:", file)
-            // sound system later
         }
     }
 }

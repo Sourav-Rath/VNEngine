@@ -14,7 +14,7 @@
           "text": "Pick up the key",
           "next": 1,
           "setFlags": {
-            "hasKey": { "set": true }
+            "hasKey": true
           },
           "events": [
             { "type": "print", "message": "You reach down..." },
@@ -26,7 +26,7 @@
           "text": "Gain karma",
           "next": 1,
           "setFlags": {
-            "karma": { "add": 2 }
+            "karma": 2
           },
           "events": [
             { "type": "print", "message": "You focus..." },
@@ -38,7 +38,7 @@
           "text": "Open the door",
           "next": 2,
           "conditions": {
-            "hasKey": { "eq": true }
+            "hasKey": true
           },
           "events": [
             { "type": "print", "message": "You insert the key..." },
@@ -50,7 +50,7 @@
           "text": "Force the door",
           "next": 3,
           "conditions": {
-            "karma": { "gte": 4 }
+            "karma": 4
           },
           "events": [
             { "type": "print", "message": "You charge at the door..." },
