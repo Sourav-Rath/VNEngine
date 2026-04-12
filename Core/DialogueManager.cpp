@@ -17,9 +17,6 @@ DialogueManager::DialogueManager(QObject *parent)
 
     loadFromJson(":/VNEngine/Data/story.json");
 
-    qDebug() << "Exists:"
-             << QFile::exists(":/VNEngine/Data/story.json");
-
     if (!nodes.isEmpty()) {
         setCurrentNode(nodes.firstKey());
     }
@@ -70,6 +67,71 @@ void DialogueManager::setCurrentNode(int nodeId)
         executeEvents(node.events);
 }
 
+// ================= CONDITION SYSTEM =================
+
+bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
+{
+    QString logic = group.value("logic", "AND").toString();
+    QVariantList rules = group.value("rules").toList();
+
+    if (rules.isEmpty())
+        return true;
+
+    if (logic == "AND")
+    {
+        for (const QVariant& ruleVar : rules)
+        {
+            if (!evaluateCondition(ruleVar.toMap()))
+                return false;
+        }
+        return true;
+    }
+    else if (logic == "OR")
+    {
+        for (const QVariant& ruleVar : rules)
+        {
+            if (evaluateCondition(ruleVar.toMap()))
+                return true;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+bool DialogueManager::evaluateCondition(const QVariantMap& condition)
+{
+    if (condition.contains("logic") && condition.contains("rules"))
+        return evaluateConditionGroup(condition);
+
+    for (auto it = condition.begin(); it != condition.end(); ++it)
+    {
+        QString key = it.key();
+        QVariantMap ops = it.value().toMap();
+        QVariant current = m_state.value(key, QVariant());
+
+        for (auto op = ops.begin(); op != ops.end(); ++op)
+        {
+            QString type = op.key();
+            QVariant required = op.value();
+
+            bool passed = true;
+
+            if (type == "eq") passed = (current == required);
+            else if (type == "neq") passed = (current != required);
+            else if (type == "gte") passed = (current.toInt() >= required.toInt());
+            else if (type == "lte") passed = (current.toInt() <= required.toInt());
+            else if (type == "gt") passed = (current.toInt() > required.toInt());
+            else if (type == "lt") passed = (current.toInt() < required.toInt());
+
+            if (!passed)
+                return false;
+        }
+    }
+
+    return true;
+}
+
 // ================= CHOICE =================
 
 void DialogueManager::evaluateChoice(Choice& choice)
@@ -77,36 +139,25 @@ void DialogueManager::evaluateChoice(Choice& choice)
     choice.isEnabled = true;
     choice.requirement = "";
 
-    for (auto it = choice.conditions.begin(); it != choice.conditions.end(); ++it)
-    {
-        QVariant current = m_state.value(it.key(), QVariant());
-        QVariant required = it.value();
+    if (choice.conditions.isEmpty())
+        return;
 
-        // 🔥 INT → >= comparison
-        if (current.canConvert<int>() && required.canConvert<int>())
-        {
-            if (current.toInt() < required.toInt())
-            {
-                choice.isEnabled = false;
-                choice.requirement = it.key() + ": " + required.toString();
-                return;
-            }
-        }
-        // 🔥 BOOL / OTHER → equality
-        else
-        {
-            if (current != required)
-            {
-                choice.isEnabled = false;
-                choice.requirement = it.key() + ": " + required.toString();
-                return;
-            }
-        }
+    if (!evaluateCondition(choice.conditions))
+    {
+        choice.isEnabled = false;
+        choice.requirement = "Requirements not met";
     }
 }
 
 void DialogueManager::selectChoice(int index)
 {
+    // HARD LOCK FIRST
+    if (m_inputLocked)
+        return;
+
+    m_inputLocked = true;
+    emit inputLockedChanged();
+
     const QList<Choice>& choices = m_choiceModel.getChoices();
 
     if (index < 0 || index >= choices.size())
@@ -125,13 +176,13 @@ void DialogueManager::selectChoice(int index)
         return;
     }
 
-
     // APPLY FLAGS
     for (auto it = choice.setFlags.begin(); it != choice.setFlags.end(); ++it)
     {
         setFlag(it.key(), it.value());
     }
 
+    // EVENTS
     if (!choice.events.isEmpty())
     {
         executeEvents(choice.events);
@@ -146,10 +197,8 @@ void DialogueManager::selectChoice(int index)
     {
         setCurrentNode(choice.nextNodeId);
 
-        // UNLOCK because no event system will handle it
         m_inputLocked = false;
         emit inputLockedChanged();
-
     }
 }
 
@@ -157,7 +206,6 @@ void DialogueManager::selectChoice(int index)
 
 void DialogueManager::executeEvents(const QList<QVariantMap>& events)
 {
-
     for (const auto& ev : events)
         eventQueue.enqueue(ev);
 
@@ -173,7 +221,6 @@ void DialogueManager::processNextEvent()
 {
     if (eventQueue.isEmpty())
     {
-        // UNLOCK INPUT HERE
         m_inputLocked = false;
         emit inputLockedChanged();
         return;
@@ -185,56 +232,42 @@ void DialogueManager::processNextEvent()
     if (type == "print")
     {
         emit eventPrint(ev["message"].toString());
-        QTimer::singleShot(0, this, [this]() {
-    processNextEvent();
-});
     }
     else if (type == "log")
     {
         emit eventLog(ev["message"].toString());
-        QTimer::singleShot(0, this, [this]() {
-        processNextEvent();
-});
     }
     else if (type == "sound")
     {
         emit eventSound(ev["file"].toString());
-        QTimer::singleShot(0, this, [this]() {
-        processNextEvent();
-});
     }
     else if (type == "delay")
     {
         int time = ev["time"].toInt();
 
         QTimer::singleShot(time, this, [this]() {
-            QTimer::singleShot(0, this, [this]() {
             processNextEvent();
-});
         });
+        return;
     }
     else if (type == "transition")
     {
-        int nextNode = ev["nextNode"].toInt();
-
-        setCurrentNode(nextNode);
-
-        QTimer::singleShot(0, this, [this]() {
-        processNextEvent();
-});
+        setCurrentNode(ev["nextNode"].toInt());
     }
+
+    QTimer::singleShot(0, this, [this]() {
+        processNextEvent();
+    });
 }
 
 // ================= STATE =================
 
 void DialogueManager::setFlag(const QString& key, const QVariant& value)
 {
-    // BOOL → overwrite
     if (value.typeId() == QMetaType::Bool)
     {
         m_state[key] = value;
     }
-    // INT → stack
     else if (value.canConvert<int>())
     {
         int current = m_state.value(key, 0).toInt();
@@ -266,64 +299,53 @@ void DialogueManager::loadFromJson(const QString& path)
         return;
     }
 
-    qDebug() << "SUCCESSFULLY OPENED JSON:" << path;
-
     QByteArray data = file.readAll();
     file.close();
 
-    QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
-
-    if (error.error != QJsonParseError::NoError) {
-        qDebug() << "JSON Parse Error:" << error.errorString();
-        return;
-    }
-
-    if (!doc.isObject()) {
-        qDebug() << "JSON root is not object!";
-        return;
-    }
+    QJsonDocument doc = QJsonDocument::fromJson(data);
 
     QJsonObject root = doc.object();
-
-    if (!root.contains("nodes")) {
-        qDebug() << "JSON missing 'nodes' key!";
-        return;
-    }
-
     QJsonArray array = root["nodes"].toArray();
 
-    for (const QJsonValue& val : array) {
+    for (const QJsonValue& val : array)
+    {
         QJsonObject obj = val.toObject();
 
         Node node;
         node.id = obj["id"].toInt();
         node.text = obj["text"].toString();
+        node.nextNodeId = obj.contains("next") ? obj["next"].toInt() : -1;
 
-        node.nextNodeId = obj.contains("next")
-                              ? obj["next"].toInt()
-                              : -1;
-
-        // CHOICES
-        if (obj.contains("choices")) {
+        if (obj.contains("choices"))
+        {
             QJsonArray choicesArray = obj["choices"].toArray();
 
-            for (const QJsonValue& cVal : choicesArray) {
+            for (const QJsonValue& cVal : choicesArray)
+            {
                 QJsonObject cObj = cVal.toObject();
 
                 Choice choice;
                 choice.text = cObj["text"].toString();
                 choice.nextNodeId = cObj["next"].toInt();
 
-                // CONDITIONS
-                if (cObj.contains("conditions")) {
+                if (cObj.contains("conditions"))
+                {
                     QJsonObject condObj = cObj["conditions"].toObject();
-                    for (auto it = condObj.begin(); it != condObj.end(); ++it)
-                        choice.conditions[it.key()] = it.value().toVariant();
+
+                    // 🔥 IMPORTANT: SUPPORT BOTH SIMPLE + ADVANCED
+                    if (condObj.contains("logic"))
+                    {
+                        choice.conditions = condObj.toVariantMap();
+                    }
+                    else
+                    {
+                        for (auto it = condObj.begin(); it != condObj.end(); ++it)
+                            choice.conditions[it.key()] = it.value().toObject().toVariantMap();
+                    }
                 }
 
-                // FLAGS
-                if (cObj.contains("setFlags")) {
+                if (cObj.contains("setFlags"))
+                {
                     QJsonObject flagObj = cObj["setFlags"].toObject();
                     for (auto it = flagObj.begin(); it != flagObj.end(); ++it)
                         choice.setFlags[it.key()] = it.value().toVariant();
@@ -335,25 +357,16 @@ void DialogueManager::loadFromJson(const QString& path)
 
         nodes[node.id] = node;
     }
-
-    qDebug() << "Loaded nodes:" << nodes.size();
 }
 
 // ================= NAV =================
 
 void DialogueManager::next()
 {
-    qDebug() << "NEXT FUNCTION CALLED";
-
-    if (!nodes.contains(currentNodeId)) {
-        qDebug() << "Node not found!";
+    if (!nodes.contains(currentNodeId))
         return;
-    }
 
     int nextId = nodes[currentNodeId].nextNodeId;
-
-    qDebug() << "Current:" << currentNodeId
-             << "Next:" << nextId;
 
     if (nextId != -1)
         setCurrentNode(nextId);
@@ -374,35 +387,27 @@ void DialogueManager::saveGame()
     saveData["state"] = stateObj;
 
     QFile file("save.json");
-    if (!file.open(QIODevice::WriteOnly)) {
-        qDebug() << "Save failed!";
+    if (!file.open(QIODevice::WriteOnly))
         return;
-    }
 
     file.write(QJsonDocument(saveData).toJson());
     file.close();
-
-    qDebug() << "Game Saved";
 }
 
 void DialogueManager::loadGame()
 {
     QFile file("save.json");
 
-    if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << "No save file!";
+    if (!file.open(QIODevice::ReadOnly))
         return;
-    }
 
     QByteArray data = file.readAll();
     file.close();
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
 
-    if (!doc.isObject()) {
-        qDebug() << "Invalid save file!";
+    if (!doc.isObject())
         return;
-    }
 
     QJsonObject saveData = doc.object();
 
@@ -415,8 +420,6 @@ void DialogueManager::loadGame()
         m_state[it.key()] = it.value().toVariant();
 
     setCurrentNode(currentNodeId);
-
-    qDebug() << "Game Loaded";
 }
 
 void DialogueManager::restartGame()

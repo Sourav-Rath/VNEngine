@@ -31,7 +31,6 @@ public:
     Q_INVOKABLE void setFlag(const QString& key, const QVariant& value);
     Q_INVOKABLE QVariant getFlag(const QString& key) const;
 
-
     bool inputLocked() const { return m_inputLocked; }
 
 signals:
@@ -46,6 +45,10 @@ signals:
 private:
     void setCurrentNode(int nodeId);
     void evaluateChoice(Choice& choice);
+
+    // NEW SYSTEM
+    bool evaluateCondition(const QVariantMap& condition);
+    bool evaluateConditionGroup(const QVariantMap& group);
 
     void executeEvents(const QList<QVariantMap>& events);
     void processNextEvent();

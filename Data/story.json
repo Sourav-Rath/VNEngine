@@ -34,29 +34,68 @@
             { "type": "print", "message": "You feel stronger." }
           ]
         },
+
+
         {
-          "text": "Open the door",
+          "text": "Open the door (needs key)",
           "next": 2,
           "conditions": {
-            "hasKey": true
-          },
-          "events": [
-            { "type": "print", "message": "You insert the key..." },
-            { "type": "delay", "time": 1000 },
-            { "type": "print", "message": "The lock clicks open." }
-          ]
+            "hasKey": { "eq": true }
+          }
         },
+
+
         {
-          "text": "Force the door",
+          "text": "Force the door (needs karma >= 4)",
           "next": 3,
           "conditions": {
-            "karma": 4
-          },
-          "events": [
-            { "type": "print", "message": "You charge at the door..." },
-            { "type": "delay", "time": 1000 },
-            { "type": "log", "message": "The door breaks open!" }
-          ]
+            "karma": { "gte": 4 }
+          }
+        },
+
+
+        {
+          "text": "Open door (Key OR Strength)",
+          "next": 2,
+          "conditions": {
+            "logic": "OR",
+            "rules": [
+              { "hasKey": { "eq": true } },
+              { "karma": { "gte": 4 } }
+            ]
+          }
+        },
+
+
+        {
+          "text": "Secret Door (Key AND Karma)",
+          "next": 2,
+          "conditions": {
+            "logic": "AND",
+            "rules": [
+              { "hasKey": { "eq": true } },
+              { "karma": { "gte": 4 } }
+            ]
+          }
+        },
+
+
+        {
+          "text": "Chaos Option (Nested Logic)",
+          "next": 3,
+          "conditions": {
+            "logic": "AND",
+            "rules": [
+              {
+                "logic": "OR",
+                "rules": [
+                  { "karma": { "gte": 4 } },
+                  { "karma": { "lt": 0 } }
+                ]
+              },
+              { "hasKey": { "eq": true } }
+            ]
+          }
         }
       ]
     },
