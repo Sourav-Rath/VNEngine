@@ -60,4 +60,49 @@ A modular **Visual Novel Engine** built using **Qt (C++) and QML**, designed wit
 
 ---
 
-## 📂 Project Structure
+## 🔥 Current Status
+
+✅ Stable core systems  
+✅ Input handling robust  
+✅ Event system functional  
+⚠️ Condition system needs scalability improvements  
+
+---
+
+## 🛣️ Roadmap
+
+### Step 19.6 — Advanced Conditions
+- Operator-based logic (`gte`, `lte`, `eq`, `neq`)
+- Fully data-driven condition evaluation
+
+### Future Plans
+- Unified event pipeline
+- Animation system
+- Audio manager
+- UI polish & transitions
+
+---
+
+## 🧠 Design Philosophy
+
+This engine is built with a focus on:
+
+- Data-driven design
+- Modular systems
+- Scalability for complex narrative structures
+- Clean separation of logic and UI
+
+---
+
+## 📌 Author
+
+**Sourav Bhadra**  
+Game Developer & VFX Artist  
+
+---
+
+## ⚠️ Note
+
+This project is actively under development. Systems are being refined for scalability and performance.
+
+---
