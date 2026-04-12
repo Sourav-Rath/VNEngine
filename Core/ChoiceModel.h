@@ -24,6 +24,11 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QList<Choice> getChoices() const { return m_choices; }
 
+    Q_PROPERTY(int count READ rowCount NOTIFY choicesChanged)
+
+signals:
+    void choicesChanged();
+
 protected:
     QHash<int, QByteArray> roleNames() const override;
 

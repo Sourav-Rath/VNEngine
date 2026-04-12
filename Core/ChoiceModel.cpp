@@ -9,6 +9,7 @@ void ChoiceModel::setChoices(const QList<Choice> &choices)
 {
     beginResetModel();
     m_choices = choices;
+    emit choicesChanged();
     endResetModel();
 }
 
