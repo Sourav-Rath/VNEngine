@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QTimer>
 #include <QDebug>
+#include <QRandomGenerator>
 
 // ================= CONSTRUCTOR =================
 
@@ -14,7 +15,7 @@ DialogueManager::DialogueManager(QObject *parent)
 {
     m_state.clear();
 
-    // 🔥 DEFAULT STATE (CRITICAL FIX)
+
     m_state["karma"] = 0;
     m_state["sanity"] = 0;
     m_state["knowledge"] = 0;
@@ -68,11 +69,22 @@ void DialogueManager::setCurrentNode(int nodeId)
 
     m_choiceModel.setChoices(processed);
 
+    // START / STOP TIMER BASED ON GAME STATE
+    if (processed.isEmpty())
+    {
+        m_timer.stop(); // no choices → stop timer
+    }
+    else
+    {
+        startTimer(); // choices exist → start timer
+    }
+
     emit dialogueChanged();
     emit choicesChanged();
 
     if (!node.events.isEmpty())
         executeEvents(node.events);
+
 }
 
 // ================= CONDITION SYSTEM =================
@@ -175,6 +187,32 @@ QString DialogueManager::buildRequirementText(const QVariantMap& condition)
     return parts.join(" AND ");
 }
 
+void DialogueManager::checkWarningStates()
+{
+    int sanity = m_state.value("sanity", 0).toInt();
+    int time = m_state.value("time", 0).toInt();
+
+    // SANITY WARNINGS
+    if (sanity <= -2)
+    {
+        emit eventPrint("Your mind feels unstable...");
+    }
+    if (sanity <= -4)
+    {
+        emit eventPrint("You are losing control...");
+    }
+
+    // TIME WARNINGS
+    if (time <= -2)
+    {
+        emit eventPrint("Time is running out...");
+    }
+    if (time <= -4)
+    {
+        emit eventPrint("You are running out of time!");
+    }
+}
+
 // ================= CHOICE =================
 
 void DialogueManager::evaluateChoice(Choice& choice)
@@ -182,19 +220,54 @@ void DialogueManager::evaluateChoice(Choice& choice)
     choice.isEnabled = true;
     choice.requirement = "";
 
-    if (choice.conditions.isEmpty())
-        return;
+    int sanity = m_state.value("sanity", 0).toInt();
+    int time = m_state.value("time", 0).toInt();
 
-    if (!evaluateCondition(choice.conditions))
+    // =========================
+    // BASE CONDITION CHECK
+    // =========================
+    if (!choice.conditions.isEmpty())
     {
-        choice.isEnabled = false;
-        QString text = buildRequirementText(choice.conditions);
-        choice.requirement = text.isEmpty() ? "Requirements not met" : "Need " + text;
+        if (!evaluateCondition(choice.conditions))
+        {
+            choice.isEnabled = false;
+            QString text = buildRequirementText(choice.conditions);
+            choice.requirement = text.isEmpty()
+                                     ? "Requirements not met"
+                                     : "Need " + text;
+            return;
+        }
+    }
+
+    // =========================
+    // GLOBAL PRESSURE: TIME
+    // =========================
+    if (time <= -5)
+    {
+        // disable "slow" or "extra" actions
+        if (choice.text.contains("Meditate") ||
+            choice.text.contains("Listen") ||
+            choice.text.contains("Pick up"))
+        {
+            choice.isEnabled = false;
+            choice.requirement = "No time left";
+            return;
+        }
+    }
+
+    // =========================
+    // GLOBAL PRESSURE: SANITY
+    // =========================
+    if (sanity <= -5)
+    {
+        // distort text (psychological effect)
+        choice.text = "[Distorted] " + choice.text;
     }
 }
 
 void DialogueManager::selectChoice(int index)
 {
+    m_timer.stop();
     if (m_inputLocked)
         return;
 
@@ -249,6 +322,7 @@ void DialogueManager::processNextEvent()
 {
     if (eventQueue.isEmpty())
     {
+        checkFailStates();
         m_inputLocked = false;
         emit inputLockedChanged();
         return;
@@ -309,12 +383,77 @@ void DialogueManager::setFlag(const QString& key, const QVariant& value)
     emit stateChanged();
     emit choicesChanged();
 
+    checkWarningStates();
     checkFailStates();
 }
 
 QVariant DialogueManager::getFlag(const QString& key)
 {
     return m_state.value(key, 0);
+}
+
+int DialogueManager::timer() const
+{
+    return m_timeLeft;
+}
+
+void DialogueManager::startTimer()
+{
+    m_timer.stop();
+    disconnect(&m_timer, nullptr, this, nullptr);
+
+    int sanity = m_state.value("sanity", 0).toInt();
+    int time = m_state.value("time", 0).toInt();
+
+    // DEFAULT
+    m_timeLeft = 5;
+
+    // SANITY PRESSURE
+    if (sanity <= -3)
+        m_timeLeft = 3;
+
+    if (sanity <= -6)
+        m_timeLeft = 2;
+
+    // TIME PRESSURE
+    if (time <= -3)
+        m_timeLeft = qMin(m_timeLeft, 3);
+
+    if (time <= -6)
+        m_timeLeft = qMin(m_timeLeft, 2);
+
+    m_timeLeft += QRandomGenerator::global()->bounded(0, 2);
+
+    emit timerChanged();
+
+    connect(&m_timer, &QTimer::timeout, this, [this]() {
+
+        m_timeLeft--;
+        emit timerChanged();
+
+        if (m_timeLeft <= 0)
+        {
+            m_timer.stop();
+            handleTimeout();
+        }
+
+    });
+
+    m_timer.start(1000);
+}
+
+void DialogueManager::handleTimeout()
+{
+    qDebug() << "TIMEOUT TRIGGERED";
+
+    emit eventPrint("You hesitated...");
+
+    // penalty
+    setFlag("sanity", -1);
+    setFlag("time", -1);
+
+    // reload same node
+    setCurrentNode(currentNodeId);
 }
 
 // ================= JSON =================
@@ -408,10 +547,20 @@ void DialogueManager::checkFailStates()
     int sanity = m_state.value("sanity", 0).toInt();
     int time = m_state.value("time", 0).toInt();
 
-    if (sanity <= -3 || time <= -5)
+    // ===== SANITY FAILURE =====
+    if (sanity <= -8)
     {
-        qDebug() << "FAIL TRIGGERED";
-        setCurrentNode(3);
+        emit eventPrint("You completely lose your mind...");
+        setCurrentNode(999);
+        return;
+    }
+
+    // ===== TIME FAILURE =====
+    if (time <= -10)
+    {
+        emit eventPrint("Time has run out...");
+        setCurrentNode(998);
+        return;
     }
 }
 

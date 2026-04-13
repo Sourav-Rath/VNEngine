@@ -4,6 +4,7 @@
 #include <QVariant>
 #include <QMap>
 #include <QQueue>
+#include <QTimer>
 
 #include "Node.h"
 #include "ChoiceModel.h"
@@ -15,6 +16,7 @@ class DialogueManager : public QObject
     Q_PROPERTY(ChoiceModel* choicesModel READ choicesModel NOTIFY choicesChanged)
     Q_PROPERTY(bool inputLocked READ inputLocked NOTIFY inputLockedChanged)
     Q_PROPERTY(QVariantMap state READ getState NOTIFY stateChanged)
+    Q_PROPERTY(int timer READ timer NOTIFY timerChanged)
 
 public:
     explicit DialogueManager(QObject *parent = nullptr);
@@ -35,6 +37,8 @@ public:
 
     QVariantMap getState() const;
 
+    int timer() const;
+
     bool inputLocked() const { return m_inputLocked; }
 
 signals:
@@ -46,13 +50,13 @@ signals:
     void eventLog(QString message);
     void eventSound(QString file);
 
+    void timerChanged();
     void stateChanged();
 
 private:
     void setCurrentNode(int nodeId);
     void evaluateChoice(Choice& choice);
 
-    // NEW SYSTEM
     bool evaluateCondition(const QVariantMap& condition);
     bool evaluateConditionGroup(const QVariantMap& group);
 
@@ -62,6 +66,11 @@ private:
     void loadFromJson(const QString &path);
 
     void checkFailStates();
+    void checkWarningStates();
+
+
+    void startTimer();
+    void handleTimeout();
 
 private:
     QMap<int, Node> nodes;
@@ -72,4 +81,7 @@ private:
 
     QQueue<QVariantMap> eventQueue;
     bool m_inputLocked = false;
+
+    QTimer m_timer;
+    int m_timeLeft = 5;
 };

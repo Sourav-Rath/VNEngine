@@ -63,6 +63,14 @@ ApplicationWindow {
         }
 
         Text {
+            text: "Time Left: " + dialogueManager.timer
+
+            color: dialogueManager.timer <= 2 ? "red" : "white"
+
+            font.pixelSize: 22
+        }
+
+        Text {
             text: dialogueManager ? dialogueManager.currentText : ""
             font.pixelSize: 24
             color: "white"

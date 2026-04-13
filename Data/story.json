@@ -136,6 +136,24 @@
       "events": [
         { "type": "print", "message": "Perfect escape." }
       ]
+    },
+
+
+    {
+      "id": 998,
+      "text": "You ran out of time. The darkness consumes you.",
+      "events": [
+        { "type": "print", "message": "Too late..." }
+      ]
+    },
+
+
+    {
+      "id": 999,
+      "text": "Your mind collapses completely. Reality no longer exists.",
+      "events": [
+        { "type": "print", "message": "You are gone." }
+      ]
     }
   ]
 }
