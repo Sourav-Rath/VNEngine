@@ -17,7 +17,15 @@
           "setFlags": {
             "hasKey": true,
             "time": -1
-          }
+          },
+          "delayedEffects": [
+            {
+              "delay": 2,
+              "effects": {
+                "sanity": -1
+              }
+            }
+          ]
         },
 
         {
@@ -26,7 +34,15 @@
           "setFlags": {
             "karma": 2,
             "time": -2
-          }
+          },
+          "delayedEffects": [
+            {
+              "delay": 2,
+              "effects": {
+                "karma": 1
+              }
+            }
+          ]
         },
 
         {
@@ -35,7 +51,15 @@
           "setFlags": {
             "knowledge": 1,
             "sanity": -2
-          }
+          },
+          "delayedEffects": [
+            {
+              "delay": 2,
+              "effects": {
+                "sanity": -3
+              }
+            }
+          ]
         },
 
         {
@@ -44,7 +68,15 @@
           "setFlags": {
             "violence": 1,
             "sanity": -1
-          }
+          },
+          "delayedEffects": [
+            {
+              "delay": 1,
+              "effects": {
+                "sanity": -2
+              }
+            }
+          ]
         },
 
         {
@@ -138,7 +170,6 @@
       ]
     },
 
-
     {
       "id": 998,
       "text": "You ran out of time. The darkness consumes you.",
@@ -146,7 +177,6 @@
         { "type": "print", "message": "Too late..." }
       ]
     },
-
 
     {
       "id": 999,

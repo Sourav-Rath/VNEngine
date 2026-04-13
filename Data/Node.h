@@ -5,6 +5,12 @@
 #include <QMap>
 #include <QVariant>
 
+struct DelayedEffect
+{
+    QVariantMap effects;
+    int turnsRemaining;
+};
+
 struct Choice
 {
     QString text;
@@ -17,11 +23,12 @@ struct Choice
     QMap<QString, QVariant> setFlags;
 
     QList<QVariantMap> events;
+    QList<DelayedEffect> delayedEffects;
 };
 
 struct Node
 {
-    int id = -1;   // ✅ THIS WAS MISSING
+    int id = -1;
 
     QString text;
 

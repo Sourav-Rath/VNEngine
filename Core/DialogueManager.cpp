@@ -268,6 +268,7 @@ void DialogueManager::evaluateChoice(Choice& choice)
 void DialogueManager::selectChoice(int index)
 {
     m_timer.stop();
+
     if (m_inputLocked)
         return;
 
@@ -292,11 +293,30 @@ void DialogueManager::selectChoice(int index)
         return;
     }
 
+    // =========================
+    //  APPLY IMMEDIATE FLAGS (YOU WERE MISSING THIS)
+    // =========================
     for (auto it = choice.setFlags.begin(); it != choice.setFlags.end(); ++it)
     {
         setFlag(it.key(), it.value());
     }
 
+    // =========================
+    //  STORE DELAYED EFFECTS
+    // =========================
+    for (const auto& delayed : choice.delayedEffects)
+    {
+        m_delayedEffects.append(delayed);
+    }
+
+    // =========================
+    //  PROCESS DELAYED SYSTEM
+    // =========================
+    processDelayedEffects();
+
+    // =========================
+    //  MOVE TO NEXT NODE
+    // =========================
     setCurrentNode(choice.nextNodeId);
 
     m_inputLocked = false;
@@ -317,6 +337,7 @@ void DialogueManager::executeEvents(const QList<QVariantMap>& events)
         processNextEvent();
     });
 }
+
 
 void DialogueManager::processNextEvent()
 {
@@ -371,20 +392,31 @@ QVariantMap DialogueManager::getState() const
 
 void DialogueManager::setFlag(const QString& key, const QVariant& value)
 {
-    if (value.typeId() == QMetaType::Bool)
+    if (!m_state.contains(key))
+    {
         m_state[key] = value;
-    else if (value.canConvert<int>())
-        m_state[key] = m_state.value(key, 0).toInt() + value.toInt();
+    }
     else
-        m_state[key] = value;
+    {
+        // accumulate numbers
+        if (value.canConvert<int>())
+        {
+            int current = m_state.value(key).toInt();
+            int add = value.toInt();
+            m_state[key] = current + add;
+        }
+        else
+        {
+            // bool / others → overwrite
+            m_state[key] = value;
+        }
+    }
 
     qDebug() << "FLAG SET:" << key << "=" << m_state[key];
 
     emit stateChanged();
-    emit choicesChanged();
 
     checkWarningStates();
-    checkFailStates();
 }
 
 QVariant DialogueManager::getFlag(const QString& key)
@@ -454,6 +486,27 @@ void DialogueManager::handleTimeout()
 
     // reload same node
     setCurrentNode(currentNodeId);
+}
+
+void DialogueManager::processDelayedEffects()
+{
+    for (int i = m_delayedEffects.size() - 1; i >= 0; --i)
+    {
+        m_delayedEffects[i].turnsRemaining--;
+
+        if (m_delayedEffects[i].turnsRemaining <= 0)
+        {
+            for (auto it = m_delayedEffects[i].effects.begin();
+                 it != m_delayedEffects[i].effects.end(); ++it)
+            {
+                setFlag(it.key(), it.value());
+            }
+
+            emit eventPrint("Something feels off...");
+
+            m_delayedEffects.removeAt(i);
+        }
+    }
 }
 
 // ================= JSON =================

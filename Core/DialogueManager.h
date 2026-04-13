@@ -84,4 +84,7 @@ private:
 
     QTimer m_timer;
     int m_timeLeft = 5;
+
+    QList<DelayedEffect> m_delayedEffects;
+    void processDelayedEffects();
 };
