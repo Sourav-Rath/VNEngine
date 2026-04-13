@@ -14,6 +14,7 @@ class DialogueManager : public QObject
     Q_PROPERTY(QString currentText READ currentText NOTIFY dialogueChanged)
     Q_PROPERTY(ChoiceModel* choicesModel READ choicesModel NOTIFY choicesChanged)
     Q_PROPERTY(bool inputLocked READ inputLocked NOTIFY inputLockedChanged)
+    Q_PROPERTY(QVariantMap state READ getState NOTIFY stateChanged)
 
 public:
     explicit DialogueManager(QObject *parent = nullptr);
@@ -30,7 +31,9 @@ public:
     Q_INVOKABLE void restartGame();
 
     Q_INVOKABLE void setFlag(const QString& key, const QVariant& value);
-    Q_INVOKABLE QVariant getFlag(const QString& key) const;
+    Q_INVOKABLE QVariant getFlag(const QString& key);
+
+    QVariantMap getState() const;
 
     bool inputLocked() const { return m_inputLocked; }
 
@@ -42,6 +45,8 @@ signals:
     void eventPrint(QString message);
     void eventLog(QString message);
     void eventSound(QString file);
+
+    void stateChanged();
 
 private:
     void setCurrentNode(int nodeId);
@@ -55,6 +60,8 @@ private:
     void processNextEvent();
 
     void loadFromJson(const QString &path);
+
+    void checkFailStates();
 
 private:
     QMap<int, Node> nodes;

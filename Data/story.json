@@ -2,119 +2,139 @@
   "nodes": [
     {
       "id": 0,
-      "text": "You wake up in a dark room.",
+      "text": "You wake up in a suffocating dark room. Your head hurts. Time is slipping.",
       "next": 1
     },
 
     {
       "id": 1,
-      "text": "There is a key and a locked door.",
+      "text": "There is a key, a locked door, and something whispering. You feel time running out.",
       "choices": [
-        {
-          "text": "Pick up the key",
-          "next": 1,
-          "setFlags": {
-            "hasKey": true
-          },
-          "events": [
-            { "type": "print", "message": "You reach down..." },
-            { "type": "delay", "time": 800 },
-            { "type": "print", "message": "You picked up the key." }
-          ]
-        },
-        {
-          "text": "Gain karma",
-          "next": 1,
-          "setFlags": {
-            "karma": 2
-          },
-          "events": [
-            { "type": "print", "message": "You focus..." },
-            { "type": "delay", "time": 800 },
-            { "type": "print", "message": "You feel stronger." }
-          ]
-        },
-
 
         {
-          "text": "Open the door (needs key)",
+          "text": "Pick up the key (-1 Time)",
+          "next": 1,
+          "setFlags": {
+            "hasKey": true,
+            "time": -1
+          }
+        },
+
+        {
+          "text": "Meditate (+2 Karma, -2 Time)",
+          "next": 1,
+          "setFlags": {
+            "karma": 2,
+            "time": -2
+          }
+        },
+
+        {
+          "text": "Listen to whisper (+1 Knowledge, -2 Sanity)",
+          "next": 1,
+          "setFlags": {
+            "knowledge": 1,
+            "sanity": -2
+          }
+        },
+
+        {
+          "text": "Kick the door (+1 Violence, -1 Sanity)",
+          "next": 1,
+          "setFlags": {
+            "violence": 1,
+            "sanity": -1
+          }
+        },
+
+        {
+          "text": "Escape quickly (Requires Time ≥ -2)",
           "next": 2,
           "conditions": {
-            "hasKey": { "eq": true }
+            "time": { "gte": -2 }
           }
         },
 
-
         {
-          "text": "Force the door (needs karma >= 4)",
-          "next": 3,
-          "conditions": {
-            "karma": { "gte": 4 }
-          }
-        },
-
-
-        {
-          "text": "Open door (Key OR Strength)",
+          "text": "Force door (Violence ≥ 2 OR Karma ≥ 4)",
           "next": 2,
           "conditions": {
             "logic": "OR",
             "rules": [
-              { "hasKey": { "eq": true } },
+              { "violence": { "gte": 2 } },
               { "karma": { "gte": 4 } }
             ]
           }
         },
 
-
         {
-          "text": "Secret Door (Key AND Karma)",
-          "next": 2,
+          "text": "Controlled escape (Key + Sanity ≥ 0)",
+          "next": 5,
           "conditions": {
             "logic": "AND",
             "rules": [
               { "hasKey": { "eq": true } },
-              { "karma": { "gte": 4 } }
+              { "sanity": { "gte": 0 } }
             ]
           }
         },
 
+        {
+          "text": "Break reality (Knowledge ≥ 2 AND Sanity < 0)",
+          "next": 4,
+          "conditions": {
+            "logic": "AND",
+            "rules": [
+              { "knowledge": { "gte": 2 } },
+              { "sanity": { "lt": 0 } }
+            ]
+          }
+        },
 
         {
-          "text": "Chaos Option (Nested Logic)",
+          "text": "Collapse (Sanity ≤ -3 OR Time ≤ -5)",
           "next": 3,
           "conditions": {
-            "logic": "AND",
+            "logic": "OR",
             "rules": [
-              {
-                "logic": "OR",
-                "rules": [
-                  { "karma": { "gte": 4 } },
-                  { "karma": { "lt": 0 } }
-                ]
-              },
-              { "hasKey": { "eq": true } }
+              { "sanity": { "lte": -3 } },
+              { "time": { "lte": -5 } }
             ]
           }
         }
+
       ]
     },
 
     {
       "id": 2,
-      "text": "The door opens. You escaped.",
+      "text": "You escape just in time. Your heart is racing.",
       "events": [
-        { "type": "delay", "time": 500 },
-        { "type": "print", "message": "Freedom!" }
+        { "type": "print", "message": "You made it out." }
       ]
     },
 
     {
       "id": 3,
-      "text": "You failed and got caught.",
+      "text": "You waited too long. Your mind breaks.",
       "events": [
-        { "type": "delay", "time": 500 },
-        { "type": "print", "message": "Game Over." }
+        { "type": "print", "message": "You lost yourself." }
+      ]
+    },
+
+    {
+      "id": 4,
+      "text": "Reality tears apart. You transcend.",
+      "events": [
+        { "type": "print", "message": "You are no longer human." }
+      ]
+    },
+
+    {
+      "id": 5,
+      "text": "You escape with control. Balanced and aware.",
+      "events": [
+        { "type": "print", "message": "Perfect escape." }
       ]
     }
   ]

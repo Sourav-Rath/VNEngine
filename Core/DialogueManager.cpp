@@ -13,6 +13,14 @@ DialogueManager::DialogueManager(QObject *parent)
     : QObject(parent)
 {
     m_state.clear();
+
+    // 🔥 DEFAULT STATE (CRITICAL FIX)
+    m_state["karma"] = 0;
+    m_state["sanity"] = 0;
+    m_state["knowledge"] = 0;
+    m_state["violence"] = 0;
+    m_state["time"] = 0;
+
     m_choiceModel.setChoices({});
 
     loadFromJson(":/VNEngine/Data/story.json");
@@ -74,9 +82,6 @@ bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
     QString logic = group.value("logic", "AND").toString();
     QVariantList rules = group.value("rules").toList();
 
-    qDebug() << "[GROUP] Logic:" << logic
-             << "| Rules:" << rules.size();
-
     if (rules.isEmpty())
         return true;
 
@@ -85,10 +90,7 @@ bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
         for (const QVariant& ruleVar : rules)
         {
             if (!evaluateCondition(ruleVar.toMap()))
-            {
-                qDebug() << "[GROUP FAIL - AND]";
                 return false;
-            }
         }
         return true;
     }
@@ -97,17 +99,11 @@ bool DialogueManager::evaluateConditionGroup(const QVariantMap& group)
         for (const QVariant& ruleVar : rules)
         {
             if (evaluateCondition(ruleVar.toMap()))
-            {
-                qDebug() << "[GROUP PASS - OR]";
                 return true;
-            }
         }
-
-        qDebug() << "[GROUP FAIL - OR]";
         return false;
     }
 
-    qDebug() << "[WARNING] Unknown logic type:" << logic;
     return true;
 }
 
@@ -120,48 +116,19 @@ bool DialogueManager::evaluateCondition(const QVariantMap& condition)
     {
         QString key = it.key();
         QVariantMap ops = it.value().toMap();
-        QVariant current = m_state.value(key, QVariant());
+        QVariant current = m_state.value(key, 0);
 
         for (auto op = ops.begin(); op != ops.end(); ++op)
         {
             QString type = op.key();
             QVariant required = op.value();
 
-            qDebug() << "[CHECK]"
-                     << key
-                     << type
-                     << required
-                     << "| Current:" << current;
-
-            bool passed = true;
-
-            if (type == "eq") passed = (current == required);
-            else if (type == "neq") passed = (current != required);
-            else if (type == "gte") passed = (current.toInt() >= required.toInt());
-            else if (type == "lte") passed = (current.toInt() <= required.toInt());
-            else if (type == "gt") passed = (current.toInt() > required.toInt());
-            else if (type == "lt") passed = (current.toInt() < required.toInt());
-            else
-            {
-                qDebug() << "[ERROR] Invalid operator:" << type
-                         << "for key:" << key;
-                return false;
-            }
-
-            if (passed)
-            {
-                qDebug() << "[PASS]" << key;
-            }
-            else
-            {
-                qDebug() << "[FAIL]"
-                         << key
-                         << type
-                         << required
-                         << "| Current:" << current;
-
-                return false;
-            }
+            if (type == "eq" && !(current == required)) return false;
+            if (type == "neq" && !(current != required)) return false;
+            if (type == "gte" && !(current.toInt() >= required.toInt())) return false;
+            if (type == "lte" && !(current.toInt() <= required.toInt())) return false;
+            if (type == "gt" && !(current.toInt() > required.toInt())) return false;
+            if (type == "lt" && !(current.toInt() < required.toInt())) return false;
         }
     }
 
@@ -170,7 +137,6 @@ bool DialogueManager::evaluateCondition(const QVariantMap& condition)
 
 QString DialogueManager::buildRequirementText(const QVariantMap& condition)
 {
-    // GROUP CASE (AND / OR)
     if (condition.contains("logic") && condition.contains("rules"))
     {
         QString logic = condition.value("logic").toString();
@@ -179,16 +145,13 @@ QString DialogueManager::buildRequirementText(const QVariantMap& condition)
         QStringList parts;
 
         for (const QVariant& rule : rules)
-        {
             parts.append(buildRequirementText(rule.toMap()));
-        }
 
         QString joiner = (logic == "AND") ? " AND " : " OR ";
 
         return "(" + parts.join(joiner) + ")";
     }
 
-    // SIMPLE CASE
     QStringList parts;
 
     for (auto it = condition.begin(); it != condition.end(); ++it)
@@ -201,16 +164,11 @@ QString DialogueManager::buildRequirementText(const QVariantMap& condition)
             QString type = op.key();
             QVariant value = op.value();
 
-            QString text;
-
-            if (type == "eq") text = key;
-            else if (type == "neq") text = key + " ≠ " + value.toString();
-            else if (type == "gte") text = key + " ≥ " + value.toString();
-            else if (type == "lte") text = key + " ≤ " + value.toString();
-            else if (type == "gt") text = key + " > " + value.toString();
-            else if (type == "lt") text = key + " < " + value.toString();
-
-            parts.append(text);
+            if (type == "gte") parts.append(key + " ≥ " + value.toString());
+            else if (type == "lte") parts.append(key + " ≤ " + value.toString());
+            else if (type == "gt") parts.append(key + " > " + value.toString());
+            else if (type == "lt") parts.append(key + " < " + value.toString());
+            else if (type == "eq") parts.append(key);
         }
     }
 
@@ -230,13 +188,8 @@ void DialogueManager::evaluateChoice(Choice& choice)
     if (!evaluateCondition(choice.conditions))
     {
         choice.isEnabled = false;
-
         QString text = buildRequirementText(choice.conditions);
-
-        if (text.isEmpty())
-            choice.requirement = "Requirements not met";
-        else
-            choice.requirement = "Need " + text;
+        choice.requirement = text.isEmpty() ? "Requirements not met" : "Need " + text;
     }
 }
 
@@ -271,23 +224,10 @@ void DialogueManager::selectChoice(int index)
         setFlag(it.key(), it.value());
     }
 
-    if (!choice.events.isEmpty())
-    {
-        executeEvents(choice.events);
+    setCurrentNode(choice.nextNodeId);
 
-        QVariantMap transition;
-        transition["type"] = "transition";
-        transition["nextNode"] = choice.nextNodeId;
-
-        eventQueue.enqueue(transition);
-    }
-    else
-    {
-        setCurrentNode(choice.nextNodeId);
-
-        m_inputLocked = false;
-        emit inputLockedChanged();
-    }
+    m_inputLocked = false;
+    emit inputLockedChanged();
 }
 
 // ================= EVENTS =================
@@ -350,28 +290,31 @@ void DialogueManager::processNextEvent()
 
 // ================= STATE =================
 
+QVariantMap DialogueManager::getState() const
+{
+    return m_state;
+}
+
 void DialogueManager::setFlag(const QString& key, const QVariant& value)
 {
     if (value.typeId() == QMetaType::Bool)
-    {
         m_state[key] = value;
-    }
     else if (value.canConvert<int>())
-    {
-        int current = m_state.value(key, 0).toInt();
-        m_state[key] = current + value.toInt();
-    }
+        m_state[key] = m_state.value(key, 0).toInt() + value.toInt();
     else
-    {
         m_state[key] = value;
-    }
 
     qDebug() << "FLAG SET:" << key << "=" << m_state[key];
+
+    emit stateChanged();
+    emit choicesChanged();
+
+    checkFailStates();
 }
 
-QVariant DialogueManager::getFlag(const QString& key) const
+QVariant DialogueManager::getFlag(const QString& key)
 {
-    return m_state.value(key, QVariant());
+    return m_state.value(key, 0);
 }
 
 // ================= JSON =================
@@ -403,7 +346,7 @@ void DialogueManager::loadFromJson(const QString& path)
 
     if (!root.contains("nodes"))
     {
-        qDebug() << "[JSON ERROR] Missing 'nodes' key";
+        qDebug() << "[JSON ERROR] Missing 'nodes'";
         return;
     }
 
@@ -432,18 +375,10 @@ void DialogueManager::loadFromJson(const QString& path)
 
                 if (cObj.contains("conditions"))
                 {
-                    if (!cObj["conditions"].isObject())
-                    {
-                        qDebug() << "[ERROR] Conditions must be object in choice:"
-                                 << choice.text;
-                    }
-
                     QJsonObject condObj = cObj["conditions"].toObject();
 
                     if (condObj.contains("logic"))
-                    {
                         choice.conditions = condObj.toVariantMap();
-                    }
                     else
                     {
                         for (auto it = condObj.begin(); it != condObj.end(); ++it)
@@ -466,6 +401,20 @@ void DialogueManager::loadFromJson(const QString& path)
     }
 }
 
+// ================= FAIL SYSTEM =================
+
+void DialogueManager::checkFailStates()
+{
+    int sanity = m_state.value("sanity", 0).toInt();
+    int time = m_state.value("time", 0).toInt();
+
+    if (sanity <= -3 || time <= -5)
+    {
+        qDebug() << "FAIL TRIGGERED";
+        setCurrentNode(3);
+    }
+}
+
 // ================= NAV =================
 
 void DialogueManager::next()
@@ -484,7 +433,6 @@ void DialogueManager::next()
 void DialogueManager::saveGame()
 {
     QJsonObject saveData;
-
     saveData["currentNode"] = currentNodeId;
 
     QJsonObject stateObj;
@@ -512,7 +460,6 @@ void DialogueManager::loadGame()
     file.close();
 
     QJsonDocument doc = QJsonDocument::fromJson(data);
-
     if (!doc.isObject())
         return;
 
@@ -521,6 +468,13 @@ void DialogueManager::loadGame()
     currentNodeId = saveData["currentNode"].toInt();
 
     m_state.clear();
+
+    //  RESET DEFAULTS
+    m_state["karma"] = 0;
+    m_state["sanity"] = 0;
+    m_state["knowledge"] = 0;
+    m_state["violence"] = 0;
+    m_state["time"] = 0;
 
     QJsonObject stateObj = saveData["state"].toObject();
     for (auto it = stateObj.begin(); it != stateObj.end(); ++it)
@@ -533,6 +487,15 @@ void DialogueManager::restartGame()
 {
     m_state.clear();
 
+    //  RESET DEFAULT STATE
+    m_state["karma"] = 0;
+    m_state["sanity"] = 0;
+    m_state["knowledge"] = 0;
+    m_state["violence"] = 0;
+    m_state["time"] = 0;
+
     if (!nodes.isEmpty())
         setCurrentNode(nodes.firstKey());
+
+    emit stateChanged();
 }

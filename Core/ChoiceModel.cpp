@@ -31,25 +31,26 @@ QVariant ChoiceModel::data(const QModelIndex &index, int role) const
     case TextRole:
         return choice.text;
 
-    case NextNodeRole:
-        return choice.nextNodeId;
-
     case EnabledRole:
         return choice.isEnabled;
 
     case RequirementRole:
         return choice.requirement;
-    }
 
-    return QVariant();
+    case SetFlagsRole:
+        return choice.setFlags;
+
+    default:
+        return QVariant();
+    }
 }
 
 QHash<int, QByteArray> ChoiceModel::roleNames() const
 {
     return {
         { TextRole, "text" },
-        { NextNodeRole, "nextNodeId" },
         { EnabledRole, "enabled" },
-        { RequirementRole, "requirement" }
+        { RequirementRole, "requirement" },
+        { SetFlagsRole, "setFlags" }
     };
 }

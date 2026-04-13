@@ -48,25 +48,40 @@ ApplicationWindow {
         }
 
         Text {
+            id: statsText
+
+            text: dialogueManager
+                  ? "Karma: " + dialogueManager.state["karma"]
+                    + " | Sanity: " + dialogueManager.state["sanity"]
+                    + " | Knowledge: " + dialogueManager.state["knowledge"]
+                    + " | Violence: " + dialogueManager.state["violence"]
+                    + " | Time: " + dialogueManager.state["time"]
+                  : ""
+
+            color: "#bbbbbb"
+            font.pixelSize: 14
+        }
+
+        Text {
             text: dialogueManager ? dialogueManager.currentText : ""
             font.pixelSize: 24
             color: "white"
             wrapMode: Text.WordWrap
         }
 
+        // EVENT BOX (FIXED)
         Rectangle {
-            visible: eventText.visible   // THIS IS THE FIX
-
+            visible: eventText.visible
             width: parent.width
             height: 60
             color: "#111111"
             radius: 6
 
+            opacity: visible ? 1 : 0
+
             Behavior on opacity {
                 NumberAnimation { duration: 200 }
             }
-
-            opacity: visible ? 1 : 0
 
             Text {
                 id: eventText
@@ -77,7 +92,7 @@ ApplicationWindow {
             }
         }
 
-        // FIXED NEXT BUTTON (NO BROKEN BINDING)
+        // NEXT BUTTON
         Button {
             text: "Next"
 
@@ -102,33 +117,75 @@ ApplicationWindow {
             spacing: 10
 
             Repeater {
-                id: choiceRepeater
                 model: dialogueManager ? dialogueManager.choicesModel : null
 
-                delegate: Rectangle {
+                // FULLY FIXED INTERACTIVE DELEGATE
+                delegate: Item {
                     width: 400
-                    height: 60
-                    radius: 8
+                    height: 70
 
-                    color: model.enabled ? "#2e2e2e" : "#1a1a1a"
-                    border.color: model.enabled ? "#5cff8d" : "#555555"
-                    border.width: 1
+                    property bool hovered: false
+                    property bool pressed: false
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 8
+
+                        color: pressed
+                               ? "#1f3d2b"
+                               : hovered
+                                 ? "#2a2a2a"
+                                 : (model.enabled ? "#2e2e2e" : "#1a1a1a")
+
+                        border.color: model.enabled ? "#5cff8d" : "#555555"
+                        border.width: 1
+                    }
 
                     Column {
                         anchors.fill: parent
                         anchors.margins: 10
+                        spacing: 4
 
                         Text {
                             text: model.text
                             color: model.enabled ? "white" : "#888888"
                             font.pixelSize: 16
+                            wrapMode: Text.WordWrap
                         }
 
                         Text {
-                            text: model.enabled ? "" : "Requires: " + model.requirement
+                            text: model.enabled ? "" : model.requirement
                             color: "#ff6b6b"
                             font.pixelSize: 12
+                            wrapMode: Text.WordWrap
                             visible: !model.enabled
+                        }
+
+                        Text {
+                            text: {
+                                if (!model.setFlags)
+                                    return ""
+
+                                let parts = []
+
+                                for (let key in model.setFlags) {
+                                    let val = model.setFlags[key]
+
+                                    if (val === true)
+                                        parts.push("+ " + key)
+                                    else if (val > 0)
+                                        parts.push("+" + val + " " + key)
+                                    else if (val < 0)
+                                        parts.push(val + " " + key)
+                                }
+
+                                return parts.join(", ")
+                            }
+
+                            color: "#6be3ff"
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                            visible: model.enabled
                         }
                     }
 
@@ -137,6 +194,14 @@ ApplicationWindow {
                         enabled: dialogueManager
                                  ? (model.enabled && !dialogueManager.inputLocked)
                                  : false
+
+                        hoverEnabled: true
+
+                        onEntered: parent.hovered = true
+                        onExited: parent.hovered = false
+
+                        onPressed: parent.pressed = true
+                        onReleased: parent.pressed = false
 
                         onClicked: {
                             dialogueManager.selectChoice(index)
@@ -147,19 +212,27 @@ ApplicationWindow {
         }
     }
 
-    Connections {
+    Connections
+    {
         target: dialogueManager
+
+        function onChoicesChanged() {
+
+            console.log("Choices updated:",
+                        dialogueManager.choicesModel.count)
+        }
 
         function onEventPrint(message) {
             eventText.text = message
             eventText.visible = true
         }
 
-        function onChoicesChanged() {
-            // FORCE UI REFRESH
-            // This is the missing piece
-            console.log("Choices updated, count:",
-                        dialogueManager.choicesModel.count)
+        function onEventLog(message) {
+            console.log("LOG:", message)
+        }
+
+        function onEventSound(file) {
+            console.log("SOUND:", file)
         }
     }
 }

@@ -11,10 +11,12 @@ class ChoiceModel : public QAbstractListModel
 public:
     enum Roles {
         TextRole = Qt::UserRole + 1,
-        NextNodeRole,
         EnabledRole,
-        RequirementRole
+        RequirementRole,
+        SetFlagsRole
     };
+
+
 
     explicit ChoiceModel(QObject *parent = nullptr);
 
