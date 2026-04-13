@@ -5,12 +5,20 @@ ApplicationWindow {
     visible: true
     width: 800
     height: 600
-    color: "#202020"
+
+    // DANGER LEVEL (CORE DRIVER)
+    property int dangerLevel: Math.abs(dialogueManager.state["sanity"]) +
+                              Math.abs(dialogueManager.state["time"])
+
+    // BACKGROUND REACTS TO DANGER
+    color: dangerLevel > 6 ? "#220000" : "#202020"
 
     Column {
         anchors.fill: parent
         spacing: 20
         padding: 20
+
+        // ================= CONTROLS =================
 
         Row {
             spacing: 10
@@ -47,6 +55,8 @@ ApplicationWindow {
             font.pixelSize: 14
         }
 
+        // ================= STATS =================
+
         Text {
             id: statsText
 
@@ -62,22 +72,46 @@ ApplicationWindow {
             font.pixelSize: 14
         }
 
+        // ================= TIMER =================
+
         Text {
             text: "Time Left: " + dialogueManager.timer
 
             color: dialogueManager.timer <= 2 ? "red" : "white"
 
-            font.pixelSize: 22
+            font.pixelSize: dialogueManager.timer <= 2 ? 26 : 22
+
+            scale: dialogueManager.timer <= 2 ? 1.1 : 1.0
+
+            Behavior on scale {
+                NumberAnimation { duration: 150 }
+            }
         }
+
+        // ================= DIALOGUE =================
 
         Text {
             text: dialogueManager ? dialogueManager.currentText : ""
+
             font.pixelSize: 24
             color: "white"
             wrapMode: Text.WordWrap
+
+            // PULSE UNDER PRESSURE
+            scale: dialogueManager.timer <= 2 ? 1.05 : 1.0
+
+            Behavior on scale {
+                NumberAnimation { duration: 200 }
+            }
+
+            // SANITY DISTORTION (SUBTLE)
+            rotation: dialogueManager.state["sanity"] <= -6
+                      ? (Math.random() * 2 - 1) * 2
+                      : 0
         }
 
-        // EVENT BOX (FIXED)
+        // ================= EVENT BOX =================
+
         Rectangle {
             visible: eventText.visible
             width: parent.width
@@ -100,7 +134,8 @@ ApplicationWindow {
             }
         }
 
-        // NEXT BUTTON
+        // ================= NEXT BUTTON =================
+
         Button {
             text: "Next"
 
@@ -121,13 +156,14 @@ ApplicationWindow {
             }
         }
 
+        // ================= CHOICES =================
+
         Column {
             spacing: 10
 
             Repeater {
                 model: dialogueManager ? dialogueManager.choicesModel : null
 
-                // FULLY FIXED INTERACTIVE DELEGATE
                 delegate: Item {
                     width: 400
                     height: 70
@@ -159,6 +195,11 @@ ApplicationWindow {
                             color: model.enabled ? "white" : "#888888"
                             font.pixelSize: 16
                             wrapMode: Text.WordWrap
+
+                            // DISTORT WHEN INSANE
+                            rotation: dialogueManager.state["sanity"] <= -6
+                                      ? (Math.random() * 2 - 1) * 2
+                                      : 0
                         }
 
                         Text {
@@ -220,12 +261,25 @@ ApplicationWindow {
         }
     }
 
-    Connections
-    {
+    // ================= HEARTBEAT OVERLAY =================
+
+    Rectangle {
+        anchors.fill: parent
+        color: "red"
+
+        opacity: dialogueManager.timer <= 2 ? 0.15 : 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 150 }
+        }
+    }
+
+    // ================= SIGNAL CONNECTIONS =================
+
+    Connections {
         target: dialogueManager
 
         function onChoicesChanged() {
-
             console.log("Choices updated:",
                         dialogueManager.choicesModel.count)
         }
