@@ -24,6 +24,8 @@ DialogueManager::DialogueManager(QObject *parent)
 
     m_choiceModel.setChoices({});
 
+    m_state["trustBroken"] = false;
+
     loadFromJson(":/VNEngine/Data/story.json");
 
     if (!nodes.isEmpty()) {
@@ -211,6 +213,13 @@ void DialogueManager::checkWarningStates()
     {
         emit eventPrint("You are running out of time!");
     }
+
+    // Trigger Trust Break
+
+    if (sanity <= -5)
+    {
+        m_state["trustBroken"] = true;
+    }
 }
 
 // ================= CHOICE =================
@@ -262,6 +271,22 @@ void DialogueManager::evaluateChoice(Choice& choice)
     {
         // distort text (psychological effect)
         choice.text = "[Distorted] " + choice.text;
+    }
+
+    //FAKE NUMBERS (CORE)
+    bool trustBroken = m_state.value("trustBroken", false).toBool();
+
+    if (trustBroken)
+    {
+        if (choice.text.contains("+2"))
+        {
+            choice.text.replace("+2", "+1");
+        }
+    }
+    //MISLEADING TEXT
+    if (trustBroken && QRandomGenerator::global()->bounded(100) < 30)
+    {
+        choice.text = "You feel this is a good idea...";
     }
 }
 
@@ -502,7 +527,16 @@ void DialogueManager::processDelayedEffects()
                 setFlag(it.key(), it.value());
             }
 
-            emit eventPrint("Something feels off...");
+            bool trustBroken = m_state.value("trustBroken", false).toBool();
+
+            if (trustBroken && QRandomGenerator::global()->bounded(100) < 50)
+            {
+                emit eventPrint("You feel fine...");
+            }
+            else
+            {
+                emit eventPrint("Something feels off...");
+            }
 
             m_delayedEffects.removeAt(i);
         }
